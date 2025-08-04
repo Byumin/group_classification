@@ -91,16 +91,7 @@ with tabs[0]:
                 var_name = var_info['name']
                 variables = var_info['variables']
                 formula = available_calculations.get(var_info['formula'], None)
-        
-        else:
-            st.error("업로드된 데이터프레임이 없습니다. 파일을 업로드해주세요.")
-            df = st.session_state['raw_df']
-            for i in range(num_variables):
-                var_info = st.session_state.get(f'var_{i+1}', {})
-                var_name = var_info['name']
-                variables = var_info['variables']
-                formula = available_calculations.get(var_info['formula'], None)
-                if formula and variables:
+                try:
                     if formula == 'sum':
                         df[var_name] = df[variables].sum(axis=1)
                     elif formula == 'mean':
@@ -120,25 +111,29 @@ with tabs[0]:
                     # ! 백분위는 후에 별도로 처리
                     else:
                         st.warning("변수 처리에 오류가 발생했습니다.")
-                else:
-                    st.warning("변수 처리에 오류가 발생했습니다.")
-            st.session_state['df'] = df
-            available_continuous_variables = st.session_state['continuous_variable'] + [st.session_state[f'var_{i+1}']['name'] for i in range(num_variables)]
-            st.session_state['continuous_variable'] = available_continuous_variables
-            available_discrete_variables = st.session_state['discrete_variable']
-            st.session_state['discrete_variable'] = available_discrete_variables
+                except Exception as e:
+                    st.warning(f"변수 처리에 오류가 발생했습니다: {e}")
         else:
             st.error("업로드된 데이터프레임이 없습니다. 파일을 업로드해주세요.")
-        # st.rerun()  # 페이지 새로고침
+        # 데이터프레임 업데이트
+        st.session_state['df'] = df
+        # 연속형 변수 업데이트
+        available_continuous_variables = st.session_state['continuous_variable'] + [st.session_state[f'var_{i+1}']['name'] for i in range(num_variables)]
+        st.session_state['available_continuous_variables'] = available_continuous_variables
+        # 범주형 변수 업데이트
+        available_discrete_variables = st.session_state['discrete_variable']
+        st.session_state['available_discrete_variables'] = available_discrete_variables
+        # 데이터프레임 표시
+        st.dataframe(df.head(10), use_container_width=True)
     else:
-        st.warning("변수를 생성하려면 모든 필드를 입력하고 '변수 생성' 버튼을 클릭하세요.")
+        pass
 
 with tabs[1]:
     st.header("⚙️ 분류 알고리즘")
     st.write("집단을 분류하고자 할때 사용할 알고리즘을 선택할 수 있습니다.")
     try:
-        continuous_variable = st.session_state['continuous_variable']
-        discrete_variable = st.session_state['discrete_variable']
+        available_continuous_variables = st.session_state['available_continuous_variables']
+        available_discrete_variables = st.session_state['available_discrete_variables']
         df = st.session_state['df']
 
         # 알고리즘 목록
@@ -159,6 +154,8 @@ with tabs[1]:
         )
         if selected_algorithm == '정렬 기반 그룹화':
             st.write("정렬 기반 그룹화는 데이터를 정렬하여 그룹을 형성하는 방법입니다.")
+            # 정렬 딕셔너리 초기화
+            selected_sort_variable = {}
             sortable_variable_number = st.number_input(
                 "정렬하고자 하는 변수의 개수를 입력하세요",
                 min_value=1, max_value=10, value=1,
@@ -166,18 +163,50 @@ with tabs[1]:
             )
             for n in range(sortable_variable_number):
                 st.subheader(f"{n+1}번째 정렬 변수")
+                # 정렬 변수 선택
                 sort_variable = st.selectbox(
                     f"정렬 변수 선택",
-                    options=st.session_state.get('continuous_variable', []),
+                    options=st.session_state.get('available_continuous_variables', []),
                     key=f'sort_var_{n+1}',
                     help="정렬할 변수를 선택하세요."
                 )
+                # 오름차순 정렬 여부 선택
+                is_ascending = st.checkbox(
+                    f"오름차순 정렬 (체크: 오름차순 / 해제: 내림차순)",
+                    value=True,
+                    key=f'sort_asc_{n+1}',
+                    help="정렬 방향을 선택하세요."
+                )
+
                 if sort_variable:
-                    pass
+                    # 선택된 정렬 변수를 딕셔너리에 저장
+                    selected_sort_variable[sort_variable] = is_ascending
                 else:
                     st.warning(f"{n+1}번째 정렬 변수를 선택해주세요.")
+            print(f"Selected sort variable: {selected_sort_variable}")
+            st.session_state['selected_sort_variable_dict'] = selected_sort_variable
+        else :
+            st.warning("정렬 기반 그룹화 외의 알고리즘은 아직 구현되지 않았습니다.")
+
     except Exception as e:
         st.warning("변수를 선택하고 데이터프레임을 생성한 후 다시 시도해주세요.")
+    
+    if st.button("알고리즘 적용"):
+        if selected_algorithm == '정렬 기반 그룹화' and len(selected_sort_variable) == sortable_variable_number:
+            st.write("알고리즘을 적용합니다...")
+            variables_list = [key for key in selected_sort_variable.keys()]
+            is_ascending_list = [value for value in selected_sort_variable.values()]
+            print(variables_list, is_ascending_list)
+            sorted_df = df.sort_values(by=variables_list, ascending=is_ascending_list)
+            print(sorted_df.head(10))
+            st.session_state['sorted_df'] = sorted_df
+            st.dataframe(sorted_df.head(10), use_container_width=True)
+        elif selected_algorithm != '정렬 기반 그룹화':
+            st.warning("정렬 기반 그룹화 외의 알고리즘은 아직 구현되지 않았습니다.")
+        else:
+            st.warning("변수를 선택해주세요.")
+    else:
+        pass
         
 
 with tabs[2]:
