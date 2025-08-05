@@ -196,9 +196,7 @@ with tabs[1]:
             st.write("알고리즘을 적용합니다...")
             variables_list = [key for key in selected_sort_variable.keys()]
             is_ascending_list = [value for value in selected_sort_variable.values()]
-            print(variables_list, is_ascending_list)
             sorted_df = df.sort_values(by=variables_list, ascending=is_ascending_list)
-            print(sorted_df.head(10))
             st.session_state['sorted_df'] = sorted_df
             st.dataframe(sorted_df.head(10), use_container_width=True)
         elif selected_algorithm != '정렬 기반 그룹화':
@@ -208,7 +206,6 @@ with tabs[1]:
     else:
         pass
         
-
 with tabs[2]:
     st.header("📊 분류 전 분포 확인")
     st.write("여기에 다른 내용을 작성할 수 있습니다.")
