@@ -1,6 +1,11 @@
 import streamlit as st
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import altair as alt
+import plotly.express as px
 
+st.set_page_config(page_title="집단 분류 파이프라인", layout="wide")
 # 사이드바 메뉴
 st.sidebar.title("메타 설정")
 st.sidebar.header("1. 파일 업로드")
@@ -38,7 +43,6 @@ else:
     st.sidebar.warning("변수를 선택해주세요.")
 
 # =============== 본문 영역 ===============
-st.set_page_config(page_title="집단 분류 파이프라인", layout="wide")
 st.title("🔧 집단 분류 파이프라인")
 
 # 본문 탭 구성
@@ -127,7 +131,7 @@ with tabs[0]:
         st.dataframe(df.head(10), use_container_width=True)
     else:
         pass
-
+# [2] 분류 알고리즘
 with tabs[1]:
     st.header("⚙️ 분류 알고리즘")
     st.write("집단을 분류하고자 할때 사용할 알고리즘을 선택할 수 있습니다.")
@@ -154,7 +158,8 @@ with tabs[1]:
         )
         if selected_algorithm == '정렬 기반 그룹화':
             st.write("정렬 기반 그룹화는 데이터를 정렬하여 그룹을 형성하는 방법입니다.")
-            # 정렬 딕셔너리 초기화
+
+            # 정렬할 연속형 변수 선택
             selected_sort_variable = {}
             sortable_variable_number = st.number_input(
                 "정렬하고자 하는 변수의 개수를 입력하세요",
@@ -185,29 +190,61 @@ with tabs[1]:
                     st.warning(f"{n+1}번째 정렬 변수를 선택해주세요.")
             print(f"Selected sort variable: {selected_sort_variable}")
             st.session_state['selected_sort_variable_dict'] = selected_sort_variable
+
+            # 그룹별 균형을 맞춰야하는 범주형 변수 파라미터 설정
+            st.subheader("그룹별 균형을 맞춰야하는 범주형 변수")
+            selected_discrete_variable = st.multiselect(
+                "범주형 변수를 선택하세요",
+                options=available_discrete_variables,
+                help="그룹별 균형을 맞추고자 하는 범주형 변수를 선택하세요."
+                )
+            # 범주형 변수 선택이 없을 수 있음.
+            st.session_state['selected_discrete_variable'] = selected_discrete_variable
+            print(f"Selected discrete variable: {selected_discrete_variable}")
+
         else :
             st.warning("정렬 기반 그룹화 외의 알고리즘은 아직 구현되지 않았습니다.")
 
     except Exception as e:
         st.warning("변수를 선택하고 데이터프레임을 생성한 후 다시 시도해주세요.")
-    
-    if st.button("알고리즘 적용"):
-        if selected_algorithm == '정렬 기반 그룹화' and len(selected_sort_variable) == sortable_variable_number:
-            st.write("알고리즘을 적용합니다...")
-            variables_list = [key for key in selected_sort_variable.keys()]
-            is_ascending_list = [value for value in selected_sort_variable.values()]
-            sorted_df = df.sort_values(by=variables_list, ascending=is_ascending_list)
-            st.session_state['sorted_df'] = sorted_df
-            st.dataframe(sorted_df.head(10), use_container_width=True)
-        elif selected_algorithm != '정렬 기반 그룹화':
-            st.warning("정렬 기반 그룹화 외의 알고리즘은 아직 구현되지 않았습니다.")
-        else:
-            st.warning("변수를 선택해주세요.")
-    else:
-        pass
-        
+
+# [3] 분류 전 분포 확인
 with tabs[2]:
     st.header("📊 분류 전 분포 확인")
+    st.write("선택한 변수의 분포를 확인할 수 있습니다.")
+    try:
+        # 세션 상태에서 데이터프레임과 변수 가져오기
+        df = st.session_state['df']
+        selected_sort_variable_dict = st.session_state['selected_sort_variable_dict'] # 정렬 연속형 변수 딕셔너리
+        discrete_variable = st.session_state['selected_discrete_variable'] # 범주형 변수
+        print(df)
+        print(f"Selected sort variable dict: {selected_sort_variable_dict}")
+        print(f"Selected discrete variable: {discrete_variable}")
+
+        if all(k in st.session_state for k in ['df', 'selected_sort_variable_dict', 'selected_discrete_variable']):
+            # 연속형 변수와 범주형 변수의 분포를 시각화
+            if selected_sort_variable_dict:
+                st.subheader("연속형 변수 분포")
+                # 연속형 변수 설정 기준으로 df 정렬
+                df_sorted = df.sort_values(by=list(selected_sort_variable_dict.keys()), ascending=list(selected_sort_variable_dict.values()))
+
+                for var in selected_sort_variable_dict.keys():
+                    st.write(f"🔹 `{var}` 의 분포")
+                    fig = px.histogram(df_sorted, x=var, nbins=30, title=f"{var} Histogram")
+                    st.plotly_chart(fig, use_container_width=True)
+
+            if discrete_variable:
+                st.subheader("범주형 변수 분포")
+                for var in discrete_variable:
+                    st.write(f"🔹 `{var}` 의 분포")
+                    freq_df = df[var].value_counts().reset_index()
+                    freq_df.columns = [var, 'count']
+                    fig = px.bar(freq_df, x=var, y='count', title=f"{var} 빈도수")
+                    st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning("데이터프레임과 변수가 설정되지 않았습니다. 먼저 변수를 선택하고 데이터프레임을 생성해주세요.")
+    except Exception as e:
+        st.warning(f"분포 시각화 중 오류가 발생했습니다: {e}")
     st.write("여기에 다른 내용을 작성할 수 있습니다.")
 
 with tabs[3]:
