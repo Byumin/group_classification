@@ -422,6 +422,25 @@ with tabs[4]:
             )
 
             st.plotly_chart(fig, use_container_width=True)
+        
+        # 범주형 변수가 있는 경우
+        # 범주형 변수의 시각화 블럭 (그룹별)
+        discrete_variable = st.session_state.get('selected_discrete_variable', [])
+        if discrete_variable:
+            for var in discrete_variable:
+                st.write(f"🔹 `{var}` 의 분포 (막대그래프)")
+                freq_df = result_grouping_df.groupby(['group', var]).size().reset_index(name='count')
+                fig = px.bar(
+                    freq_df, x=var, y='count',
+                    color='group', barmode='group',
+                    height=500,
+                    title=f"{var}의 그룹별 분포"
+                )
+                fig.update_layout(
+                    xaxis_title=var,
+                    yaxis_title="빈도 (count)"
+                )
+                st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
         st.error(f"분포 시각화 중 오류가 발생했습니다: {e}")
