@@ -441,6 +441,8 @@ with tabs[4]:
                     yaxis_title="빈도 (count)"
                 )
                 st.plotly_chart(fig, use_container_width=True)
+        else:
+            pass
 
     except Exception as e:
         st.error(f"분포 시각화 중 오류가 발생했습니다: {e}")

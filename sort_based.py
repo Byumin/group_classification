@@ -4,16 +4,25 @@ from turtle import st
 
 # 분배 방식에 따른 df 생성 함수
 def get_sortable_method_df(df, selected_sort_variable_dict, group_count, sortable_method):
+    '''
+    selected_sort_variable_dict: {'변수명': True/False} 형태로, True는 오름차순 정렬, False는 내림차순 정렬
+    group_count: 그룹의 개수
+    sortable_method: 'round-robin' 또는 'serpentine' 중 하나
+    '''
+    # 선택된 정렬 변수에 따라 df를 정렬하고 그룹을 할당하는 함수
+    # sortable_method는 'round-robin' 또는 'serpentine' 중 하나로 가정
+    # round-robin: 순차적으로 그룹을 할당 (1->2->3->4->1->2->3->4)
     if sortable_method == 'round-robin':
         df_sorted = df.sort_values(by=list(selected_sort_variable_dict.keys()), ascending=list(selected_sort_variable_dict.values())).reset_index(drop=True)
         df_sorted['group'] = None
-        for i, idx in enumerate(df.index):
+        for i, idx in enumerate(df_sorted.index):
             group = i % group_count # 나머지로 그룹 번호 결정 (0, 1, 2, 3)
             df_sorted.at[idx, 'group'] = group
 
+    # serpentine: 그룹을 순차적으로 할당하되, 홀수 그룹은 정방향, 짝수 그룹은 역방향으로 할당 (1->2->3->4->3->2->1)
     elif sortable_method == 'serpentine':
-        direction = 1
-        group = 0
+        direction = 1 # 1: 정방향, -1: 역방향
+        group = 0 # 현재 그룹 번호
         df_sorted = df.sort_values(by=list(selected_sort_variable_dict.keys()), ascending=list(selected_sort_variable_dict.values())).reset_index(drop=True)
         df_sorted['group'] = None
         for i, idx in enumerate(df_sorted.index):
@@ -28,6 +37,15 @@ def get_sortable_method_df(df, selected_sort_variable_dict, group_count, sortabl
 
 
 def run(context):
+    '''
+    df: DataFrame, 학생들의 정보가 담긴 DataFrame
+    selected_sort_variable_dict: dict, {'변수명': True/False} 형태로, True는 오름차순 정렬, False는 내림차순 정렬
+    selected_discrete_variable: list, 범주형 변수의 리스트
+    selected_algorithm: str, 선택된 알고리즘 이름
+    group_count: int, 그룹의 개수
+    sortable_method: str, 'round-robin' 또는 'serpentine'
+    group_names: list, 그룹 이름의 리스트 (선택적)
+    '''
     df = context.get('df')
     selected_sort_variable_dict = context.get('selected_sort_variable_dict')
     selected_discrete_variable = context.get('selected_discrete_variable')
@@ -36,6 +54,7 @@ def run(context):
     sortable_method = context.get('sortable_method')
     group_names = context.get('group_names')
 
+    # * 선택된 정렬 변수에 따라 df를 정렬하고 그룹을 할당
     df_sorted = get_sortable_method_df(df, selected_sort_variable_dict, group_count, sortable_method)
 
     # 범주형 변수 고려 유무에 따라 그룹화 방식 결정
