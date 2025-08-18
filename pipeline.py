@@ -329,6 +329,20 @@ with tabs[3]:
         group_names.append(group_name)
     st.session_state['group_names'] = group_names
 
+    # 동명이인 처리 옵션
+    st.subheader("동명이인 처리 옵션")
+    classification_name_column = st.selectbox(
+        "동명이인 처리에 사용할 이름 컬럼을 선택해 주세요.",
+        options=df.columns.tolist()
+    )
+    classification_name_option = st.selectbox(
+        "동명이인 처리 방식을 선택해 주세요.",
+        options=["성+이름", "이름만"],
+        help="성+이름 : 성+이름이 같은 경우, 이름만 : 이름만 같은 경우"
+    )
+    st.session_state['classification_name_column'] = classification_name_column
+    st.session_state['classification_name_option'] = classification_name_option
+
     # 알고리즘에 따라 파라미터가 다양해지기 때문에 context에 다 넣어서 처리
     context = {
         'df': st.session_state.get('df', None),
@@ -337,7 +351,9 @@ with tabs[3]:
         'selected_algorithm': st.session_state.get('selected_algorithm', ''),
         'group_count': st.session_state.get('group_count', 0),
         'sortable_method': st.session_state.get('sortable_method', ''),
-        'group_names': st.session_state.get('group_names', [])
+        'group_names': st.session_state.get('group_names', []),
+        'classification_name_column': st.session_state.get('classification_name_column', ''),
+        'classification_name_option': st.session_state.get('classification_name_option', '')
     }
 
     # 집단 분류 버튼
