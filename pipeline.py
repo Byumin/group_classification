@@ -1,4 +1,5 @@
 import importlib
+import traceback
 import streamlit as st
 import pandas as pd
 
@@ -8,6 +9,7 @@ from scipy.stats import gaussian_kde # kde 추정
 import numpy as np # kde 추정
 
 import altair as alt
+import pickle
 
 st.set_page_config(page_title="집단 분류 파이프라인", layout="wide")
 # 사이드바 메뉴
@@ -223,9 +225,9 @@ with tabs[2]:
         df = st.session_state['df']
         selected_sort_variable_dict = st.session_state['selected_sort_variable_dict'] # 정렬 연속형 변수 딕셔너리
         discrete_variable = st.session_state['selected_discrete_variable'] # 범주형 변수
-        print(df)
-        print(f"Selected sort variable dict: {selected_sort_variable_dict}")
-        print(f"Selected discrete variable: {discrete_variable}")
+        #print(df)
+        #print(f"Selected sort variable dict: {selected_sort_variable_dict}")
+        #print(f"Selected discrete variable: {discrete_variable}")
 
         if all(k in st.session_state for k in ['df', 'selected_sort_variable_dict', 'selected_discrete_variable']):
             # ============================================================
@@ -308,13 +310,52 @@ with tabs[2]:
 with tabs[3]:
     st.header("🧠 집단 분류")
     st.write("집단을 분류하기 위해 필요한 규칙을 설정할 수 있습니다.")
-    # 집단 수 설정
-    group_count = st.number_input(
-        "분류할 집단의 개수를 입력하세요",
-        min_value=2, max_value=10, value=2,
-        help="분류할 집단의 개수를 입력하세요."
-    )
-    st.session_state['group_count'] = group_count
+    try:
+        # 성별 분류 선택
+        sex_classification = st.selectbox(
+            "남여 합반/분반을 선택해 주세요.",
+            options=["합반", "분반", "남학교", "여학교"],
+            help="업로드 파일에 '성별' 컬럼이 있는지 꼭 확인해 주세요."
+        )
+        st.session_state['sex_classification'] = sex_classification
+        try:
+            if sex_classification == '분반' and df['성별'].nunique() == 2:
+                # 남자 집단 갯수
+                male_class_count = st.number_input(
+                    "남자 집단의 개수를 입력하세요",
+                    min_value=1, max_value=10, value=1,
+                    help="남자 집단의 개수를 입력하세요."
+                )
+                # 여자 집단 갯수
+                female_class_count = st.number_input(
+                    "여자 집단의 개수를 입력하세요",
+                    min_value=1, max_value=10, value=1,
+                    help="여자 집단의 개수를 입력하세요."
+                )
+                st.session_state['male_class_count'] = male_class_count
+                st.session_state['female_class_count'] = female_class_count
+                st.session_state['group_count'] = male_class_count + female_class_count
+            elif sex_classification == '합반' and df['성별'].nunique() == 2:
+                group_count = st.number_input(
+                    "분류할 집단의 개수를 입력하세요",
+                    min_value=2, max_value=10, value=2,
+                    help="분류할 집단의 개수를 입력하세요."
+                )
+                st.session_state['group_count'] = group_count
+            elif sex_classification == '남학교' or sex_classification == '여학교':
+                group_count = st.number_input(
+                    "분류할 집단의 개수를 입력하세요",
+                    min_value=2, max_value=10, value=2,
+                    help="분류할 집단의 개수를 입력하세요."
+                )
+                st.session_state['group_count'] = group_count
+            else:
+                st.error("업로드 된 파일에 성별 컬럼이 없거나, 분반 또는 합반을 선택했지만 성별이 하나만 존재합니다.")
+        except Exception as e:
+            st.warning(f"성별 분류 설정 중 오류가 발생했습니다: {e}")
+    except Exception as e:
+        st.warning(f"파일을 업로드 하세요. {e}")
+
     # 정렬기반인 경우 round-robin 방식인지 serpentine 방식인지 선택
     sortable_method = st.selectbox(
         "분배 방식을 선택해 주세요.",
@@ -323,66 +364,26 @@ with tabs[3]:
     )
     st.session_state['sortable_method'] = sortable_method
     # 분류 한 후 집단명 설정
-    group_names = []
-    for i in range(group_count):
-        group_name = st.text_input(f"집단 {i+1}의 이름을 입력하세요", value=f"Group {i+1}")
-        group_names.append(group_name)
-    st.session_state['group_names'] = group_names
+    if st.session_state.get('group_count', 0) > 0:
+        full_group_names = []
+        for i in range(st.session_state['group_count']):
+            group_name = st.text_input(f"집단 {i+1}의 이름을 입력하세요", value=f"Group {i+1}")
+            full_group_names.append(group_name)
+        st.session_state['full_group_names'] = full_group_names
+    else:
+        st.warning(f"집단 이름 설정 중 오류가 발생했습니다.")
 
     # 동명이인 처리 옵션
     try:
         st.subheader("동명이인 처리 옵션")
-        classification_name_column = st.selectbox(
-            "동명이인 처리에 사용할 이름 컬럼을 선택해 주세요.",
-            options=df.columns.tolist()
-        )
         classification_name_option = st.selectbox(
             "동명이인 처리 방식을 선택해 주세요.",
             options=["성+이름", "이름만"],
             help="성+이름 : 성+이름이 같은 경우, 이름만 : 이름만 같은 경우"
         )
-        st.session_state['classification_name_column'] = classification_name_column
         st.session_state['classification_name_option'] = classification_name_option
     except Exception as e:
         st.warning(f"동명이인 처리 옵션 설정 중 오류가 발생했습니다: {e}")
-
-    
-    # 남여 합반 분반 옵션
-    try:
-        st.subheader("남여 합반/분반 설정")
-        # 남여 합반/분반 선택
-        #! 합반인 경우 -> 사용자가 설정한 이산형 변수 비율 최대한 유지 (기존 알고리즘과 동일)
-        #! 분반인 경우 -> 처음부터 남여 분리하여 그룹을 생성
-        sex_classification = st.selectbox(
-            "남여 합반/분반을 선택해 주세요.",
-            options=["합반", "분반"],
-            help="합반 : 남여를 섞어서 그룹을 생성, 분반 : 남여를 분리하여 그룹을 생성"
-        )
-        st.session_state['sex_classification'] = sex_classification
-        if sex_classification == '분반' and df['성별'].nunique() == 2:
-            # 남자 반 갯수
-            man_class_count = st.number_input(
-                "남자 반의 개수를 입력하세요",
-                min_value=1, max_value=10, value=1,
-                help="남자 반의 개수를 입력하세요."
-            )
-            # 여자 반 갯수
-            female_class_count = st.number_input(
-                "여자 반의 개수를 입력하세요",
-                min_value=1, max_value=10, value=1,
-                help="여자 반의 개수를 입력하세요."
-            )
-            st.session_state['man_class_count'] = man_class_count
-            st.session_state['female_class_count'] = female_class_count
-            # 남자 반 개수 + 여자 반 개수가 group_count와 일치하는지 확인
-            if man_class_count + female_class_count != group_count:
-                st.error("남자 반 개수와 여자 반 개수가 총 그룹 수와 일치하지 않습니다.")
-            else:
-                pass
-        else:
-            pass # 합반인 경우 별도의 설정은 없음
-    except Exception as e:
-        st.warning(f"남여 합반/분반 설정 중 오류가 발생했습니다: {e}")
 
     # 알고리즘에 따라 파라미터가 다양해지기 때문에 context에 다 넣어서 처리
     context = {
@@ -392,45 +393,63 @@ with tabs[3]:
         'selected_algorithm': st.session_state.get('selected_algorithm', ''),
         'group_count': st.session_state.get('group_count', 0),
         'sortable_method': st.session_state.get('sortable_method', ''),
-        'group_names': st.session_state.get('group_names', []),
-        'classification_name_column': st.session_state.get('classification_name_column', ''),
+        'full_group_names': st.session_state.get('full_group_names', []),
         'classification_name_option': st.session_state.get('classification_name_option', ''),
         'sex_classification': st.session_state.get('sex_classification', ''),
-        'man_class_count': st.session_state.get('man_class_count', ''), # 합반인 경우 ''처리
-        'female_class_count': st.session_state.get('female_class_count', '') # 합반인 경우 ''처리
+        'male_class_count': st.session_state.get('male_class_count', 0), # 합반인 경우 ''처리
+        'female_class_count': st.session_state.get('female_class_count', 0) # 합반인 경우 ''처리
     }
 
     # 집단 분류 버튼
     if st.button("집단 분류 시작"):
+        st.session_state['df'] = context['df']
+        st.session_state['selected_sort_variable_dict'] = context['selected_sort_variable_dict']
+        st.session_state['selected_discrete_variable'] = context['selected_discrete_variable']
+        st.session_state['selected_algorithm'] = context['selected_algorithm']
+        st.session_state['group_count'] = context['group_count']
+        st.session_state['sortable_method'] = context['sortable_method']
+        st.session_state['full_group_names'] = context['full_group_names']
+        st.session_state['classification_name_option'] = context['classification_name_option']
+        st.session_state['sex_classification'] = context['sex_classification']
+        st.session_state['male_class_count'] = context['male_class_count']
+        st.session_state['female_class_count'] = context['female_class_count']
         try:
-            if all(k in st.session_state for k in ['df', 'selected_sort_variable_dict', 'selected_discrete_variable', 'selected_algorithm', 'group_count', 'sortable_method', 'group_names', 'sex_classification']):
+            if all(k in st.session_state for k in ['df', 'selected_sort_variable_dict', 'selected_discrete_variable', 'selected_algorithm', 'group_count', 'sortable_method', 'full_group_names', 'classification_name_option', 'sex_classification', 'male_class_count', 'female_class_count']):
                 df = st.session_state['df']
                 selected_sort_variable_dict = st.session_state['selected_sort_variable_dict']
                 selected_discrete_variable = st.session_state['selected_discrete_variable']
                 selected_algorithm = st.session_state['selected_algorithm']
                 group_count = st.session_state['group_count']
                 sortable_method = st.session_state['sortable_method']
-                group_names = st.session_state['group_names']
+                full_group_names = st.session_state['full_group_names']
+                classification_name_option = st.session_state['classification_name_option']
                 sex_classification = st.session_state['sex_classification']
+                male_class_count = st.session_state['male_class_count']
+                female_class_count = st.session_state['female_class_count']
 
                 module_path = algorithms[selected_algorithm]
 
                 module = importlib.import_module(module_path)
-                result_grouping_df = module.run(context)
-                st.session_state['result_grouping_df'] = result_grouping_df
-                print(f"Result grouping df: {result_grouping_df}")
+                result_group_dict = module.run(context)
+                st.session_state['result_group_dict'] = result_group_dict
+                print(f"Result grouping df: {result_group_dict}")
+                with open('result_group_dict.pkl', 'wb') as f:
+                    pickle.dump(result_group_dict, f)
+
 
             else:
                 st.error("집단 분류를 위한 모든 파라미터가 설정되지 않았습니다. 다시 확인해주세요.")
         
         except Exception as e:
             st.error(f"집단 분류 중 오류가 발생했습니다: {e}")
+            st.text(traceback.format_exc())  # <- 전체 에러 위치 출력
 
 with tabs[4]:
     st.header("📊 분류 후 분포 확인")
     st.write("집단 분류 후 각 집단의 분포를 확인할 수 있습니다.")
-    result_grouping_df = st.session_state.get('result_grouping_df', None)
+    result_group_dict = st.session_state.get('result_group_dict', None)
     selected_sort_variable_dict = st.session_state.get('selected_sort_variable_dict', {})
+    result_grouping_df = pd.concat(result_group_dict.values(), ignore_index=True) if result_group_dict else pd.DataFrame()
     try:
         # 연속형 변수의 시각화 블럭 (그룹별)
         for var in selected_sort_variable_dict.keys():
@@ -504,6 +523,9 @@ with tabs[4]:
                 st.plotly_chart(fig, use_container_width=True)
         else:
             pass
+
+        group_counts = result_grouping_df.groupby('group').size().reset_index(name="count")
+        st.dataframe(group_counts)
 
     except Exception as e:
         st.error(f"분포 시각화 중 오류가 발생했습니다: {e}")
