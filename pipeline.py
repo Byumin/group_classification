@@ -330,18 +330,59 @@ with tabs[3]:
     st.session_state['group_names'] = group_names
 
     # 동명이인 처리 옵션
-    st.subheader("동명이인 처리 옵션")
-    classification_name_column = st.selectbox(
-        "동명이인 처리에 사용할 이름 컬럼을 선택해 주세요.",
-        options=df.columns.tolist()
-    )
-    classification_name_option = st.selectbox(
-        "동명이인 처리 방식을 선택해 주세요.",
-        options=["성+이름", "이름만"],
-        help="성+이름 : 성+이름이 같은 경우, 이름만 : 이름만 같은 경우"
-    )
-    st.session_state['classification_name_column'] = classification_name_column
-    st.session_state['classification_name_option'] = classification_name_option
+    try:
+        st.subheader("동명이인 처리 옵션")
+        classification_name_column = st.selectbox(
+            "동명이인 처리에 사용할 이름 컬럼을 선택해 주세요.",
+            options=df.columns.tolist()
+        )
+        classification_name_option = st.selectbox(
+            "동명이인 처리 방식을 선택해 주세요.",
+            options=["성+이름", "이름만"],
+            help="성+이름 : 성+이름이 같은 경우, 이름만 : 이름만 같은 경우"
+        )
+        st.session_state['classification_name_column'] = classification_name_column
+        st.session_state['classification_name_option'] = classification_name_option
+    except Exception as e:
+        st.warning(f"동명이인 처리 옵션 설정 중 오류가 발생했습니다: {e}")
+
+    
+    # 남여 합반 분반 옵션
+    try:
+        st.subheader("남여 합반/분반 설정")
+        # 남여 합반/분반 선택
+        #! 합반인 경우 -> 사용자가 설정한 이산형 변수 비율 최대한 유지 (기존 알고리즘과 동일)
+        #! 분반인 경우 -> 처음부터 남여 분리하여 그룹을 생성
+        sex_classification = st.selectbox(
+            "남여 합반/분반을 선택해 주세요.",
+            options=["합반", "분반"],
+            help="합반 : 남여를 섞어서 그룹을 생성, 분반 : 남여를 분리하여 그룹을 생성"
+        )
+        st.session_state['sex_classification'] = sex_classification
+        if sex_classification == '분반' and df['성별'].nunique() == 2:
+            # 남자 반 갯수
+            man_class_count = st.number_input(
+                "남자 반의 개수를 입력하세요",
+                min_value=1, max_value=10, value=1,
+                help="남자 반의 개수를 입력하세요."
+            )
+            # 여자 반 갯수
+            female_class_count = st.number_input(
+                "여자 반의 개수를 입력하세요",
+                min_value=1, max_value=10, value=1,
+                help="여자 반의 개수를 입력하세요."
+            )
+            st.session_state['man_class_count'] = man_class_count
+            st.session_state['female_class_count'] = female_class_count
+            # 남자 반 개수 + 여자 반 개수가 group_count와 일치하는지 확인
+            if man_class_count + female_class_count != group_count:
+                st.error("남자 반 개수와 여자 반 개수가 총 그룹 수와 일치하지 않습니다.")
+            else:
+                pass
+        else:
+            pass # 합반인 경우 별도의 설정은 없음
+    except Exception as e:
+        st.warning(f"남여 합반/분반 설정 중 오류가 발생했습니다: {e}")
 
     # 알고리즘에 따라 파라미터가 다양해지기 때문에 context에 다 넣어서 처리
     context = {
@@ -353,13 +394,16 @@ with tabs[3]:
         'sortable_method': st.session_state.get('sortable_method', ''),
         'group_names': st.session_state.get('group_names', []),
         'classification_name_column': st.session_state.get('classification_name_column', ''),
-        'classification_name_option': st.session_state.get('classification_name_option', '')
+        'classification_name_option': st.session_state.get('classification_name_option', ''),
+        'sex_classification': st.session_state.get('sex_classification', ''),
+        'man_class_count': st.session_state.get('man_class_count', ''), # 합반인 경우 ''처리
+        'female_class_count': st.session_state.get('female_class_count', '') # 합반인 경우 ''처리
     }
 
     # 집단 분류 버튼
     if st.button("집단 분류 시작"):
         try:
-            if all(k in st.session_state for k in ['df', 'selected_sort_variable_dict', 'selected_discrete_variable', 'selected_algorithm', 'group_count', 'sortable_method', 'group_names']):
+            if all(k in st.session_state for k in ['df', 'selected_sort_variable_dict', 'selected_discrete_variable', 'selected_algorithm', 'group_count', 'sortable_method', 'group_names', 'sex_classification']):
                 df = st.session_state['df']
                 selected_sort_variable_dict = st.session_state['selected_sort_variable_dict']
                 selected_discrete_variable = st.session_state['selected_discrete_variable']
@@ -367,6 +411,7 @@ with tabs[3]:
                 group_count = st.session_state['group_count']
                 sortable_method = st.session_state['sortable_method']
                 group_names = st.session_state['group_names']
+                sex_classification = st.session_state['sex_classification']
 
                 module_path = algorithms[selected_algorithm]
 
