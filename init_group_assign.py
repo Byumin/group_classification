@@ -63,25 +63,19 @@ def init_group_assign(tuples, k, final_bin_value): # x: 전체 데이터, k: 그
 
     current_group = 0
     for b in range(final_bin_value): # 각 bin마다
-        print(f"현재 bin: {b}")
-        idx_in_bin = np.where(bin_idx == b)[0]
-        print(f"현재 bin에 속한 데이터 인덱스: {idx_in_bin}")
+        print(f"현재 bin: {b}") # x와 bin_idx의 인덱스는 동일
+        idx_in_bin = np.where(bin_idx == b)[0] # 현재 bin에 속한 데이터 원본 인덱스
+        print(f"현재 bin에 속한 데이터 원본 인덱스: {idx_in_bin}")
 
-        sorted_idx_in_bin = np.argsort(x[idx_in_bin])
+        sorted_idx_in_bin = idx_in_bin[np.argsort(x[idx_in_bin])]
+        # x[idx_in_bin] bin에 속하는 데이터 값 뽑고
+        # np.argsort()로 정렬된 인덱스 뽑고
+        # idx_in_bin[정렬된 인덱스]로 원본 인덱스 매핑 / 헷갈리네
+        print(f"현재 bin에 속한 데이터 원본 인덱스(값 기준 정렬됨): {sorted_idx_in_bin}")
 
-    if len(x)
-    origin_index = 
-
-    final_bin_value = suitable_bin_value(x, k)
-    print(f"최종 bin_value: {final_bin_value}")
-    count, edges = np.histogram(x, bins=final_bin_value)
-    print(f"각 bin에 속한 데이터 개수: {count}")
-
-    group_assign = np.digitize(x, edges, right=True)
-    print(f"각 데이터의 그룹 할당 결과: {group_assign}")
-
-    unique, counts = np.unique(group_assign, return_counts=True)
-    group_count = dict(zip(unique, counts))
-    print(f"각 그룹별 데이터 개수: {group_count}")
-
+        for idx in sorted_idx_in_bin: # bin 내부에서 값 기준으로 정렬된 순서대로
+            group_assign[idx] = current_group
+            current_group = (current_group + 1) % k
+        print(f"현재까지의 그룹 배정: {group_assign}")
+    print(f"최종 그룹 배정: {group_assign}")
     return group_assign

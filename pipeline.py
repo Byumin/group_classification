@@ -529,3 +529,6 @@ with tabs[4]:
 
     except Exception as e:
         st.error(f"분포 시각화 중 오류가 발생했습니다: {e}")
+
+# streamlit run c:/Users/USER/group_classification/pipeline.py
+# streamlit run /Users/mac/insight_/peer/검수/streamlit_test.py
