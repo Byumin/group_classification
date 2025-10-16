@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-st.set_page_config(page_title="집단 분류 파이프라인", layout="wide")
+st.set_page_config(page_title="그룹 분류 파이프라인", layout="wide")
 # 사이드바 메뉴
 st.sidebar.title("메타 설정")
 st.sidebar.header("1. 파일 업로드")
@@ -42,10 +42,10 @@ if discrete_variable:
 else:
     st.sidebar.warning("변수를 선택해주세요.")
 # =============== 본문 영역 ===============
-st.title("🔧 집단 분류 파이프라인")
+st.title("🔧 그룹 분류 파이프라인")
 
 # 본문 탭 구성
-tabs = st.tabs(["🔍 명렬표 & 검사결과 비교", "🧪 변수 생성", "⚙️ 분류 알고리즘", "📊 분류 전 분포 확인", "🧠 집단 분류", "📊 분류 후 분포 확인"])
+tabs = st.tabs(["🔍 명렬표 & 검사결과 비교", "🧪 변수 생성", "⚙️ 분류 알고리즘", "🧠 그룹 분류", "📊 분류 후 분포 확인"])
 
 # 학생 명렬표와 검사 결과 데이터프레임 병합 비교 검토 필요
 # 병합했을 때 서로 겹치는 프레임과
@@ -53,7 +53,7 @@ tabs = st.tabs(["🔍 명렬표 & 검사결과 비교", "🧪 변수 생성", "�
 # 모두 시각화해서 사용자가 식별할 수 있도록
 # [1] 명렬표 & 검사결과 비교
 with tabs[0]:
-    st.header("명렬표 & 검사결과 비교")
+    #st.header("명렬표 & 검사결과 비교")
     if 'student_df' in st.session_state and 'raw_df' in st.session_state:
         student_df = st.session_state['student_df']
         raw_df = st.session_state['raw_df']
@@ -144,7 +144,7 @@ with tabs[1]:
         '백분위수': 'percentile'
     }
 
-    st.header("변수 생성")
+    #st.header("변수 생성")
     st.write("메타 설정에서 선택한 변수를 활용해 변수를 생성할 수 있습니다.")
     # 생성할 변수 갯수
     num_variables = st.number_input("생성할 변수의 개수를 입력하세요", min_value=1, max_value=10, value=1)
@@ -215,7 +215,7 @@ with tabs[1]:
 
 # [2] 분류 알고리즘
 with tabs[2]:
-    st.header("⚙️ 분류 방법 선택")
+    #st.header("분류 방법 선택")
     st.write("집단을 분류하고자 할때 사용할 방법을 선택할 수 있습니다.")
     try:
         available_continuous_variables = st.session_state['available_continuous_variables']
@@ -287,8 +287,103 @@ with tabs[2]:
     except Exception as e:
         st.warning("변수를 선택하고 데이터프레임을 생성한 후 다시 시도해주세요.")
 
+# [3] 집단 분류
+with tabs[3]:
+    #st.header("집단 분류")
+    st.write("집단을 분류하기 전에 관련한 옵션(합반, 분반 등)을 선택해주세요.")
+    try:
+        # 성별 분류 선택
+        sex_classification = st.selectbox(
+            "남여 합반/분반을 선택해 주세요.",
+            options=["합반", "분반", "남학교", "여학교"],
+            help="업로드 파일에 '성별' 컬럼이 있는지 꼭 확인해 주세요."
+        )
+        st.session_state['sex_classification'] = sex_classification
+        try:
+            if sex_classification == '분반' and df['성별'].nunique() == 2:
+                # 남자 집단 갯수
+                male_class_count = st.number_input(
+                    "남자 집단의 개수를 입력하세요",
+                    min_value=1, max_value=10, value=1,
+                    help="남자 집단의 개수를 입력하세요."
+                )
+                # 여자 집단 갯수
+                female_class_count = st.number_input(
+                    "여자 집단의 개수를 입력하세요",
+                    min_value=1, max_value=10, value=1,
+                    help="여자 집단의 개수를 입력하세요."
+                )
+                st.session_state['male_class_count'] = male_class_count
+                st.session_state['female_class_count'] = female_class_count
+                st.session_state['group_count'] = male_class_count + female_class_count
+            elif sex_classification == '합반' and df['성별'].nunique() == 2:
+                group_count = st.number_input(
+                    "분류할 집단의 개수를 입력하세요",
+                    min_value=2, max_value=10, value=2,
+                    help="분류할 집단의 개수를 입력하세요."
+                )
+                st.session_state['group_count'] = group_count
+            elif sex_classification == '남학교' or sex_classification == '여학교':
+                group_count = st.number_input(
+                    "분류할 집단의 개수를 입력하세요",
+                    min_value=2, max_value=10, value=2,
+                    help="분류할 집단의 개수를 입력하세요."
+                )
+                st.session_state['group_count'] = group_count
+            else:
+                st.error("업로드 된 파일에 성별 컬럼이 없거나, 분반 또는 합반을 선택했지만 성별이 하나만 존재합니다.")
+        except Exception as e:
+            st.warning(f"성별 분류 설정 중 오류가 발생했습니다: {e}")
+    except Exception as e:
+        st.warning(f"파일을 업로드 하세요. {e}")
 
+    # 과목기반
+    st.subheader("과목 기반 분류 여부")
+    subject_based_classification = st.radio(
+        "과목 기반 분류를 선택하세요",
+        options=["예", "아니오"],
+        help="학생 명렬표에 선택 과목에 대한 정보가 있는 경우 처리 가능합니다."
+    )
+    st.session_state['subject_based_classification'] = subject_based_classification
+
+    # 결시 학생 처리
+    st.subheader("결시생 처리")
+    special_student_handling = st.radio(
+        "결시생을 그룹별로 균형있게 배정하시겠습니까?",
+        options=["예", "아니오"],
+        help="학생 명렬표에 결시생에 대한 정보가 있는 경우 처리 가능합니다."
+    )
+    st.session_state['special_student_handling'] = special_student_handling
+
+    # 특수 학생 처리
+    st.subheader("특수 학생 처리")
+    special_student_handling = st.radio(
+        "특수 학생을 그룹별로 균형있게 배정하시겠습니까?",
+        options=["예", "아니오"],
+        help="학생 명렬표에 특수 학생에 대한 정보가 있는 경우 처리 가능합니다."
+    )
+    st.session_state['special_student_handling'] = special_student_handling
+
+    # 출신 학교 기반 분류
+    st.subheader("출신 학교 기반 분류 여부")
+    school_based_classification = st.radio(
+        "출신 학교을 고려해 그룹별로 균형있게 배정하시겠습니까?",
+        options=["예", "아니오"],
+        help="학생 명렬표에 출신 학교에 대한 정보가 있는 경우 처리 가능합니다."
+    )
+    st.session_state['school_based_classification'] = school_based_classification
+
+    if st.session_state.get('group_count', 0) > 0:
+        full_group_names = []
+        for i in range(st.session_state['group_count']):
+            group_name = st.text_input(f"집단 {i+1}의 이름을 입력하세요", value=f"Group {i+1}")
+            full_group_names.append(group_name)
+        st.session_state['full_group_names'] = full_group_names
+    else:
+        st.warning(f"집단 이름 설정 중 오류가 발생했습니다.")
+    
+    #! 동명이인은 무조건 다른 그룹으로 배정
 
 
 # streamlit run c:/Users/USER/group_classification/pipeline_v2.0.py
-# /Users/mac/insight_/group_classification/pipeline_v2.0.py
+# streamlit run /Users/mac/insight_/group_classification/pipeline_v2.0.py
