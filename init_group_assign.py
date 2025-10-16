@@ -4,8 +4,7 @@ def tuple_from_df(df, col_names):
     col_names : 고려해야할 변수명, 리스트 형태로 입력 (예:['x1'], ['x1', 'x2'])
     * 오른쪽으로 갈수록 변수 정렬 우선순위가 더 높음
     '''
-    import numpy as np
-
+    import pandas as pd
     tuples = tuple(df[col].to_numpy() for col in col_names)
     return tuples # 입력할 데이터
 
@@ -38,17 +37,37 @@ def suitable_bin_value(tuples, k): # 데이터를 살펴보고 적절한 bin_val
             print(f"적절한 bin_value: {value-1}")
             final_bin_value = value - 1
             break
-    return final_bin_value
+    return sorted_idx, sorted_x, final_bin_value
+'''
+x1와 x2를 고려해서 정렬을 했을때, x1이 같다면 x2를 기준으로 정렬
+결국 히스토그램 대상은 1차원인 변수 하나이기 때문에
+해당 변수가 동일하다면 다른 bin으로 나누는 것이 불가능
+따라서 bin 내부에서 교차 배정되는 그룹 규칙에서는
+x1과 x2 모두 고려하든 x1만 고려하든 동일한 결과가 나옴.
+'''
 
-def init_group_assign(x, k, final_bin_value): # x: 전체 데이터, k: 그룹 수, final_bin_value: suitable_bin_value 함수에서 구한 최종 bin_value
+def init_group_assign(tuples, k, final_bin_value): # x: 전체 데이터, k: 그룹 수, final_bin_value: suitable_bin_value 함수에서 구한 최종 bin_value
     import numpy as np
 
+    x = np.asarray(tuples)[-1] # 가장 우선순위가 높은 변수로 정렬 (배열 인덱싱)
     bin_edges = np.histogram_bin_edges(x, bins=final_bin_value)
     print(f"초기 bin_edges: {bin_edges}")
 
     bin_idx = np.digitize(x, bin_edges, right=True) -1
     bin_idx[x >= bin_edges[-1]] = len(bin_edges) - 2
     print(np.unique(bin_idx, return_counts=True)) # 각 bin별 데이터 수
+
+    origin_idx = np.argsort(x) # 원래 데이터 순서대로 정렬했을 때의 인덱스
+    print(f"원래 데이터 순서대로 정렬했을 때의 인덱스: {origin_idx}")
+    group_assign = np.zeros(len(x), dtype=int)
+
+    current_group = 0
+    for b in range(final_bin_value): # 각 bin마다
+        print(f"현재 bin: {b}")
+        idx_in_bin = np.where(bin_idx == b)[0]
+        print(f"현재 bin에 속한 데이터 인덱스: {idx_in_bin}")
+
+        sorted_idx_in_bin = np.argsort(x[idx_in_bin])
 
     if len(x)
     origin_index = 
