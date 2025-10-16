@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 st.set_page_config(page_title="집단 분류 파이프라인", layout="wide")
 # 사이드바 메뉴
@@ -61,40 +62,73 @@ with tabs[0]:
         st.subheader("검사 결과 데이터프레임")
         st.dataframe(raw_df.head(10), use_container_width=True)
 
-        # 공통된 열 찾기
-        common_cols = list(set(student_df.columns) & set(raw_df.columns))
-        if common_cols:
-            st.success(f"두 데이터프레임에 공통된 열이 있습니다: {common_cols}")
-            merge_col = st.selectbox("병합에 사용할 열을 선택하세요", options=common_cols)
-            if merge_col:
-                merged_df = pd.merge(student_df, raw_df, on=merge_col, how='outer', indicator=True)
-                st.subheader("병합된 데이터프레임 미리보기")
-                st.dataframe(merged_df.head(10), use_container_width=True)
+        # 학생 명렬표 프레임에서 병합할 열 만들기
+        # 학년(1자리) + 반(2자리) + 번호(2자리) + 성별(1자리) + 이름
+        student_df['학년'] = student_df['학년'].astype(str)
+        student_df['임시반'] = student_df['임시반'].astype(str).str.zfill(2)
+        student_df['임시번호'] = student_df['임시번호'].astype(str).str.zfill(2)
+        student_df['성별'] = student_df['성별'].map({'남': '1', '여': '2'}).astype(str)
+        student_df['이름'] = student_df['이름'].astype(str)
+        student_df['merge_key'] = student_df['학년'] + student_df['임시반'] + student_df['임시번호'] + student_df['성별'] + student_df['이름']
 
-                # 병합 결과 요약
-                st.subheader("병합 결과 요약")
-                merge_summary = merged_df['_merge'].value_counts().reset_index()
-                merge_summary.columns = ['Merge Status', 'Count']
-                st.dataframe(merge_summary, use_container_width=True)
+        # 검사 결과 프레임에서 병합할 열 만들기
+        # 학년반번호(5자리) + 성별(1자리) + 이름
+        raw_df['학년반번호'] = raw_df['학년반번호'].astype(str)
+        if raw_df['성별'].dtype == 'O':  # object 타입(문자열)이면 변환
+            raw_df['성별'] = raw_df['성별'].map({'남': '1', '여': '2'}).astype(str)
+        else:
+            raw_df['성별'] = raw_df['성별'].astype(str)
+        raw_df['이름'] = raw_df['이름'].astype(str)
+        raw_df['merge_key'] = raw_df['학년반번호'] + raw_df['성별'] + raw_df['이름']
 
-                # 병합 상태별로 데이터프레임 분리
-                only_in_student = merged_df[merged_df['_merge'] == 'left_only'].drop(columns=['_merge'])
-                only_in_raw = merged_df[merged_df['_merge'] == 'right_only'].drop(columns=['_merge'])
-                in_both = merged_df[merged_df['_merge'] == 'both'].drop(columns=['_merge'])
+        # merge_key 열을 기준으로 병합 후
+        # 병합된 데이터프레임 표시
+        st.subheader("병합 결과 예상")
+        st.dataframe(pd.merge(student_df, raw_df, on='merge_key', how='outer', indicator=True, suffixes=('_명렬표', '_검사결과')).head(10), use_container_width=True)
+        # 명렬표에만 있는 행 표시
+        st.subheader("명렬표에만 있는 행")
+        st.dataframe(student_df[~student_df['merge_key'].isin(raw_df['merge_key'])], use_container_width=True)
+        # 검사 결과에만 있는 행 표시
+        st.subheader("검사 결과에만 있는 행")
+        st.dataframe(raw_df[~raw_df['merge_key'].isin(student_df['merge_key'])], use_container_width=True)
 
-                # 병합 상태별 데이터프레임 표시
-                with st.expander("학생 명렬표에만 있는 데이터 보기"):
-                    st.dataframe(only_in_student, use_container_width=True)
-                with st.expander("검사 결과에만 있는 데이터 보기"):
-                    st.dataframe(only_in_raw, use_container_width=True)
-                with st.expander("양쪽 모두에 있는 데이터 보기"):
-                    st.dataframe(in_both, use_container_width=True)
+        st.write("병합 예상 결과를 확인 후, 병합을 진행하세요.")
+        # 병합 버튼
+        if st.button("병합 진행"):
+            # 무조건 merge_key로 병합
+            merged_df = pd.merge(student_df, raw_df, on='merge_key', how='outer', indicator=True, suffixes=('_명렬표', '_검사결과'))
+            st.session_state['merged_df'] = merged_df
+        else :
+            pass
+        # 병합된 데이터프레임 기반으로 결시생, 동명이인(성+이름 동일) 처리
+        # 결시생 수, 표시 / 동명이인 수(성+이름 동일), 표시
+        if 'merged_df' in st.session_state:
+            merged_df = st.session_state['merged_df']
+            st.subheader("병합된 데이터프레임")
+            st.dataframe(merged_df.head(10), use_container_width=True)
+            # 결시생
+            num_absent = merged_df[merged_df['_merge'] == 'left_only'].shape[0]
+            st.write(f"결시생 수: {num_absent}명")
+            st.dataframe(merged_df[merged_df['_merge'] == 'left_only'], use_container_width=True)
+            # 동명이인 수(이름 동일)
+            dup_names = merged_df[merged_df.duplicated('이름_명렬표', keep=False)]
+            st.write(f"동명이인 수 : {dup_names.shape[0]}명")
+            st.dataframe(dup_names, use_container_width=True)
+            # 확인한 결시생과 동명이인이 맞다면 클릭
+            if st.button("결시생, 동명이인 라벨링"):
+                st.session_state['raw_df'] = merged_df
+                merged_df['결시생'] = merged_df['_merge'].apply(lambda x: 1 if x == 'left_only' else 0)
+                merged_df['동명이인'] = merged_df.duplicated('이름_명렬표', keep=False).astype(int)
+                merged_df['동명이인_ID'] = (
+                    merged_df.groupby('이름_명렬표', sort=False).ngroup()
+                )
+                merged_df.loc[merged_df['동명이인'] == 0, '동명이인_ID'] = np.nan
+                st.session_state['merged_df'] = merged_df
+                st.success("결시생, 동명이인 라벨링이 완료되었습니다. 변수 생성을 진행해주세요.")
+                st.dataframe(merged_df, use_container_width=True)
 
-                # 병합된 데이터프레임을 세션 상태에 저장
-                st.session_state['df'] = merged_df.drop(columns=['_merge'])
-
-
-
+        else:
+            st.warning("병합을 진행해주세요.")
 
 # [1] 변수 생성 탭
 with tabs[1]:
@@ -257,3 +291,4 @@ with tabs[2]:
 
 
 # streamlit run c:/Users/USER/group_classification/pipeline_v2.0.py
+# /Users/mac/insight_/group_classification/pipeline_v2.0.py
