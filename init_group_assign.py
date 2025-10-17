@@ -23,6 +23,10 @@ def suitable_bin_value(tuples, k): # 데이터를 살펴보고 적절한 bin_val
     print(f"전체 데이터 개수: {n}")
     print(f"그룹 개수 : {k}")
 
+    if k <= 1:
+        print("그룹 수가 1개이므로 bin_value는 1로 설정합니다.")
+        return sorted_idx, sorted_x, 1
+
     max_value = None # 혹시 추후에 max_value 설정할 일이 있을까봐 남겨둠
     if max_value is None:
         max_value = n // 2
@@ -78,4 +82,4 @@ def init_group_assign(tuples, k, final_bin_value): # x: 전체 데이터, k: 그
             current_group = (current_group + 1) % k
         print(f"현재까지의 그룹 배정: {group_assign}")
     print(f"최종 그룹 배정: {group_assign}")
-    return group_assign
+    return group_assign # 원본 데이터 전체 길이와 같은 길이를 가진 1차원 numpy 배열 / 각 데이터가 속한 그룹 번호만 담긴 리스트(또는 벡터)

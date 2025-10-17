@@ -107,13 +107,15 @@ with tabs[0]:
             st.subheader("병합된 데이터프레임")
             st.dataframe(merged_df.head(10), use_container_width=True)
             # 결시생
-            num_absent = merged_df[merged_df['_merge'] == 'left_only'].shape[0]
-            st.write(f"결시생 수: {num_absent}명")
-            st.dataframe(merged_df[merged_df['_merge'] == 'left_only'], use_container_width=True)
+            absent_merged_df = merged_df[merged_df['_merge'] == 'left_only']
+            st.write(f"결시생 수: {absent_merged_df.shape[0]}명")
+            st.dataframe(absent_merged_df, use_container_width=True)
+            st.session_state['absent_merged_df'] = absent_merged_df
             # 동명이인 수(이름 동일)
-            dup_names = merged_df[merged_df.duplicated('이름_명렬표', keep=False)]
-            st.write(f"동명이인 수 : {dup_names.shape[0]}명")
-            st.dataframe(dup_names, use_container_width=True)
+            dup_names_merged_df = merged_df[merged_df.duplicated('이름_명렬표', keep=False)]
+            st.write(f"동명이인 수 : {dup_names_merged_df.shape[0]}명")
+            st.dataframe(dup_names_merged_df, use_container_width=True)
+            st.session_state['dup_names_merged_df'] = dup_names_merged_df
             # 확인한 결시생과 동명이인이 맞다면 클릭
             if st.button("결시생, 동명이인 라벨링"):
                 st.session_state['raw_df'] = merged_df
@@ -126,7 +128,8 @@ with tabs[0]:
                 st.session_state['merged_df'] = merged_df
                 st.success("결시생, 동명이인 라벨링이 완료되었습니다. 변수 생성을 진행해주세요.")
                 st.dataframe(merged_df, use_container_width=True)
-
+                st.session_state['absent_merged_df'] = merged_df[merged_df['결시생'] == 1]
+                st.session_state['dup_names_merged_df'] = merged_df[merged_df['동명이인_ID'].notna()]
         else:
             st.warning("병합을 진행해주세요.")
 
@@ -169,8 +172,8 @@ with tabs[1]:
 
     # 변수 생성 버튼
     if st.button("변수 생성"):
-        if 'raw_df' in st.session_state:
-            df = st.session_state['raw_df']
+        if 'merged_df' in st.session_state:
+            df = st.session_state['merged_df']
             for i in range(num_variables):
                 var_info = st.session_state.get(f'var_{i+1}', {})
                 var_name = var_info['name']
@@ -201,7 +204,7 @@ with tabs[1]:
         else:
             st.error("업로드된 데이터프레임이 없습니다. 파일을 업로드해주세요.")
         # 데이터프레임 업데이트
-        st.session_state['df'] = df
+        st.session_state['merged_df'] = df
         # 연속형 변수 업데이트
         available_continuous_variables = st.session_state['continuous_variable'] + [st.session_state[f'var_{i+1}']['name'] for i in range(num_variables)]
         st.session_state['available_continuous_variables'] = available_continuous_variables
@@ -220,7 +223,6 @@ with tabs[2]:
     try:
         available_continuous_variables = st.session_state['available_continuous_variables']
         available_discrete_variables = st.session_state['available_discrete_variables']
-        df = st.session_state['df']
 
         # 알고리즘 목록
         algorithms = {
@@ -268,6 +270,8 @@ with tabs[2]:
                 else:
                     st.warning(f"{n+1}번째 정렬 변수를 선택해주세요.")
             print(f"Selected sort variable: {selected_sort_variable}")
+            # 우선순위가 높은 정렬변수는 뒤에 오도록 순서 반전
+            selected_sort_variable = {k : v for k, v in reversed(selected_sort_variable.items())}
             st.session_state['selected_sort_variable_dict'] = selected_sort_variable
 
             # 그룹별 균형을 맞춰야하는 범주형 변수 파라미터 설정
@@ -289,8 +293,7 @@ with tabs[2]:
 
 # [3] 집단 분류
 with tabs[3]:
-    #st.header("집단 분류")
-    st.write("집단을 분류하기 전에 관련한 옵션(합반, 분반 등)을 선택해주세요.")
+    st.subheader("남여 합/분반 및 집단 수 설정")
     try:
         # 성별 분류 선택
         sex_classification = st.selectbox(
@@ -298,9 +301,10 @@ with tabs[3]:
             options=["합반", "분반", "남학교", "여학교"],
             help="업로드 파일에 '성별' 컬럼이 있는지 꼭 확인해 주세요."
         )
+        merged_df = st.session_state['merged_df']
         st.session_state['sex_classification'] = sex_classification
         try:
-            if sex_classification == '분반' and df['성별'].nunique() == 2:
+            if sex_classification == '분반' and merged_df['성별_명렬표'].nunique() == 2:
                 # 남자 집단 갯수
                 male_class_count = st.number_input(
                     "남자 집단의 개수를 입력하세요",
@@ -316,14 +320,21 @@ with tabs[3]:
                 st.session_state['male_class_count'] = male_class_count
                 st.session_state['female_class_count'] = female_class_count
                 st.session_state['group_count'] = male_class_count + female_class_count
-            elif sex_classification == '합반' and df['성별'].nunique() == 2:
+            elif sex_classification == '합반' and merged_df['성별_명렬표'].nunique() == 2:
                 group_count = st.number_input(
                     "분류할 집단의 개수를 입력하세요",
                     min_value=2, max_value=10, value=2,
                     help="분류할 집단의 개수를 입력하세요."
                 )
                 st.session_state['group_count'] = group_count
-            elif sex_classification == '남학교' or sex_classification == '여학교':
+            elif sex_classification == '남학교' and merged_df['성별_명렬표'].nunique() == 1:
+                group_count = st.number_input(
+                    "분류할 집단의 개수를 입력하세요",
+                    min_value=2, max_value=10, value=2,
+                    help="분류할 집단의 개수를 입력하세요."
+                )
+                st.session_state['group_count'] = group_count
+            elif sex_classification == '여학교' and merged_df['성별_명렬표'].nunique() == 1:
                 group_count = st.number_input(
                     "분류할 집단의 개수를 입력하세요",
                     min_value=2, max_value=10, value=2,
@@ -345,15 +356,52 @@ with tabs[3]:
         help="학생 명렬표에 선택 과목에 대한 정보가 있는 경우 처리 가능합니다."
     )
     st.session_state['subject_based_classification'] = subject_based_classification
+    # 과목별로 그룹 수 설정
+    if subject_based_classification == "예" and sex_classification != '분반' and 'merged_df' in st.session_state and 'group_count' in st.session_state:
+        subject_name_list = st.session_state['merged_df']['선택과목'].unique().tolist() if '선택과목' in st.session_state['merged_df'].columns else []
+        subject_group_counts = {}
+        for subject in subject_name_list:
+            group_count = st.number_input(
+                f"{subject}의 그룹 수를 입력하세요",
+                min_value=1, max_value=10, value=1,
+                help=f"{subject}의 그룹 수를 입력하세요."
+            )
+            subject_group_counts[subject] = group_count
+        st.session_state['subject_group_counts'] = subject_group_counts
+        if sum(subject_group_counts.values()) != st.session_state['group_count']:
+            st.error("과목별 그룹 수의 합이 전체 그룹 수와 일치하지 않습니다. 다시 확인해주세요.")
+        else :
+            pass
+    elif subject_based_classification == "예" and sex_classification == '분반' and 'merged_df' in st.session_state and 'male_class_count' in st.session_state and 'female_class_count' in st.session_state:
+        subject_name_list = st.session_state['merged_df']['선택과목'].unique().tolist() if '선택과목' in st.session_state['merged_df'].columns else []
+        gender_list = [1,2]
+        gender_subject_group_counts = {}
+        for gender in gender_list:
+            for subject in subject_name_list:
+                group_count = st.number_input(
+                    f"{'남자' if gender == 1 else '여자'}의 {subject} 그룹 수를 입력하세요",
+                    min_value=0, max_value=10, value=1,
+                    help=f"{'남자' if gender == 1 else '여자'}의 {subject} 그룹 수를 입력하세요."
+                )
+                gender_subject_group_counts[f"{gender}_{subject}"] = group_count
+        st.session_state['gender_subject_group_counts'] = gender_subject_group_counts
+        print(gender_subject_group_counts)
+        if sum([v for k, v in gender_subject_group_counts.items() if k.startswith('1_')]) != st.session_state['male_class_count'] or sum([v for k, v in gender_subject_group_counts.items() if k.startswith('2_')]) != st.session_state['female_class_count']:
+            st.error("과목별 그룹 수의 합이 전체 그룹 수와 일치하지 않습니다. 다시 확인해주세요.")
+        else:
+            pass
+    else:
+        pass
 
+    # ! 여기서 부터 아래에 있는 이산형변수는 모두 그룹별 균형 배정이 필요함
     # 결시 학생 처리
     st.subheader("결시생 처리")
-    special_student_handling = st.radio(
+    absent_student_handling = st.radio(
         "결시생을 그룹별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         help="학생 명렬표에 결시생에 대한 정보가 있는 경우 처리 가능합니다."
     )
-    st.session_state['special_student_handling'] = special_student_handling
+    st.session_state['absent_student_handling'] = absent_student_handling
 
     # 특수 학생 처리
     st.subheader("특수 학생 처리")
@@ -383,6 +431,213 @@ with tabs[3]:
         st.warning(f"집단 이름 설정 중 오류가 발생했습니다.")
     
     #! 동명이인은 무조건 다른 그룹으로 배정
+    # 분류 알고리즘에 따라 파라미터가 다양해저 context로 전달
+    context = {
+        'merged_df': st.session_state.get('merged_df', pd.DataFrame()),
+        'selected_algorithm': st.session_state.get('selected_algorithm', ''),
+        'selected_sort_variable_dict': st.session_state.get('selected_sort_variable_dict', {}),
+        'selected_discrete_variable': st.session_state.get('selected_discrete_variable', {}),
+        'sex_classification': st.session_state.get('sex_classification', ''),
+        'group_count': st.session_state.get('group_count', 0),
+        'subject_based_classification': st.session_state.get('subject_based_classification', ''),
+        'subject_group_counts': st.session_state.get('subject_group_counts', {}),
+        'absent_student_handling': st.session_state.get('absent_student_handling', ''),
+        'special_student_handling': st.session_state.get('special_student_handling', ''),
+        'school_based_classification': st.session_state.get('school_based_classification', ''),
+        'full_group_names': st.session_state.get('full_group_names', []),
+        'male_class_count': st.session_state.get('male_class_count', 0),
+        'female_class_count': st.session_state.get('female_class_count', 0),
+        'gender_subject_group_counts': st.session_state.get('gender_subject_group_counts', {})
+    }
+    if st.button("그룹 분류 시작"):
+        # 혹시 모르니 다시 한번 더 불러오면서 조건문 설정
+        st.session_state['merged_df'] = context['merged_df']
+        st.session_state['selected_algorithm'] = context['selected_algorithm']
+        st.session_state['selected_sort_variable_dict'] = context['selected_sort_variable_dict']
+        st.session_state['selected_discrete_variable'] = context['selected_discrete_variable']
+        st.session_state['sex_classification'] = context['sex_classification']
+        st.session_state['group_count'] = context['group_count']
+        st.session_state['subject_based_classification'] = context['subject_based_classification']
+        st.session_state['subject_group_counts'] = context['subject_group_counts']
+        st.session_state['absent_student_handling'] = context['absent_student_handling']
+        st.session_state['absent_merged_df'] = st.session_state.get('absent_merged_df', pd.DataFrame())
+        st.session_state['dup_names_merged_df'] = st.session_state.get('dup_names_merged_df', pd.DataFrame())
+        st.session_state['special_student_handling'] = context['special_student_handling']
+        st.session_state['school_based_classification'] = context['school_based_classification']
+        st.session_state['full_group_names'] = context['full_group_names']
+        st.session_state['male_class_count'] = context['male_class_count']
+        st.session_state['female_class_count'] = context['female_class_count']
+        st.session_state['gender_subject_group_counts'] = context['gender_subject_group_counts']
+        try:
+            if all(k in st.session_state for k in ['merged_df', 'selected_algorithm', 'selected_sort_variable_dict', 'selected_discrete_variable', 'sex_classification', 'group_count', 'subject_based_classification', 'absent_student_handling', 'special_student_handling', 'school_based_classification', 'full_group_names']):
+                from init_group_assign import tuple_from_df, suitable_bin_value, init_group_assign
+                # 병합된 데이터프레임 불러오기
+                df = st.session_state['merged_df'] # 앞에서 결시생, 동명이인 처리까지 완료된 데이터프레임
+                if not st.session_state['absent_merged_df'].empty:
+                    absent_df = st.session_state['absent_merged_df'] # 결시생 데이터프레임 분리
+                    df = df[~df['merge_key'].isin(absent_df['merge_key'])]
+                else:
+                    pass
+                # 기존 선택한 정렬할 연속형 변수 불러오기
+                selected_sort_variable_dict = st.session_state['selected_sort_variable_dict']
+                col_names = list(selected_sort_variable_dict.keys())
+                # 정렬할 변수 튜플화
+                tuples = tuple_from_df(df, col_names) # 앞에서 중요한 정렬변수는 뒤에 오도록 순서 반전 했음
+
+                # 남학교 or 여학교-의미없음-선택과목없음
+                if st.session_state['sex_classification'] in ['남학교', '여학교'] and st.session_state['subject_based_classification'] == '아니오':
+                    # 적절한 bin_value 찾기
+                    sorted_idx, sorted_x, final_bin_value = suitable_bin_value(tuples, st.session_state['group_count'])
+                    # 초기 그룹 배정
+                    group_assign = init_group_assign(tuples, st.session_state['group_count'], final_bin_value)
+                    st.session_state['group_assign'] = group_assign
+                    # group_assign과 merged_df 병합
+                    group_assign_df = df.copy(deep=True)
+                    group_assign_df['초기그룹'] = group_assign
+                    st.session_state['group_assign_df'] = group_assign_df
+                    st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
+                    # 그룹별로 결과 표시
+                    for group in st.session_state['full_group_names']:
+                        st.subheader(f"{group} 학생 목록")
+                        group_number = st.session_state['full_group_names'].index(group)
+                        group_students = group_assign_df[group_assign_df['초기그룹'] == group_number]
+                        st.dataframe(group_students, use_container_width=True)
+                    #! 결시생을 어디서 처리할지 고민중
+
+                # 남학교 or 여학교-의미없음-선택과목있음
+                elif st.session_state['sex_classification'] in ['남학교', '여학교'] and st.session_state['subject_based_classification'] == '예' and st.session_state['subject_group_counts']:
+                    # 선택한 과목 기반으로 데이터프레임 분리
+                    subject_group_dict = dict(tuple(df.groupby('선택과목'))) # {'과목명': 데이터프레임}
+                    # 분리된 데이터프레임 각각 처리
+                    group_assign_df = pd.DataFrame()
+                    start_group_number = 0
+                    for subject, subject_df in subject_group_dict.items():
+                        subject_group_count = st.session_state['subject_group_counts'].get(subject, 0) # 과목별 그룹 수 가지고오기
+                        st.write(f"선택과목: {subject} 학생 수: {subject_df.shape[0]}", f"할당된 그룹 수: {subject_group_count}")
+                        subject_tuples = tuple_from_df(subject_df, col_names)
+                        sorted_idx, sorted_x, final_bin_value = suitable_bin_value(subject_tuples, subject_group_count)
+                        group_assign = init_group_assign(subject_tuples, subject_group_count, final_bin_value)
+                        # 그룹 번호 조정
+                        group_assign = [g_n + start_group_number for g_n in group_assign]
+                        start_group_number = start_group_number + len(np.unique(group_assign))
+                        # group_assign과 subject_df 병합
+                        subject_df['초기그룹'] = group_assign
+                        group_assign_df = pd.concat([group_assign_df, subject_df], axis=0)
+                    st.session_state['group_assign_df'] = group_assign_df
+                    st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
+                    # 그룹별로 결과 표시
+                    for group in st.session_state['full_group_names']:
+                        st.subheader(f"{group} 학생 목록")
+                        group_number = st.session_state['full_group_names'].index(group)
+                        group_students = group_assign_df[group_assign_df['초기그룹'] == group_number]
+                        st.dataframe(group_students, use_container_width=True)
+                    #! 결시생을 어디서 처리할지 고민중
+
+                # 남여공학-분반-선택과목없음
+                elif st.session_state['sex_classification'] == '분반' and st.session_state['subject_based_classification'] == '아니오':
+                    # 선택한 과목 기반으로 데이터프레임 분리
+                    gender_group_dict = dict(tuple(df.groupby('성별_명렬표'))) # {'성별': 데이터프레임}
+                    # 분리된 데이터프레임 각각 처리
+                    group_assign_df = pd.DataFrame()
+                    start_group_number = 0
+                    for gender, gender_df in gender_group_dict.items():
+                        gender_group_count = st.session_state['male_class_count'] if gender == '1' else st.session_state['female_class_count']
+                        gender_tuples = tuple_from_df(gender_df, col_names)
+                        sorted_idx, sorted_x, final_bin_value = suitable_bin_value(gender_tuples, gender_group_count)
+                        group_assign = init_group_assign(gender_tuples, gender_group_count, final_bin_value)
+                        # 그룹 번호 조정
+                        group_assign = [g_n + start_group_number for g_n in group_assign]
+                        start_group_number = start_group_number + len(np.unique(group_assign))
+                        # group_assign과 gender_df 병합
+                        gender_df['초기그룹'] = group_assign
+                        group_assign_df = pd.concat([group_assign_df, gender_df], axis=0)
+                    st.session_state['group_assign_df'] = group_assign_df
+                    st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
+                    # 그룹별로 결과 표시
+                    for group in st.session_state['full_group_names']:
+                        st.subheader(f"{group} 학생 목록")
+                        group_number = st.session_state['full_group_names'].index(group)
+                        group_students = group_assign_df[group_assign_df['초기그룹'] == group_number]
+                        st.dataframe(group_students, use_container_width=True)
+                    #! 결시생을 어디서 처리할지 고민중
+
+                # 남여공학-분반-선택과목있음
+                elif st.session_state['sex_classification'] == '분반' and st.session_state['subject_based_classification'] == '예':
+                    # 성별, 선택한 과목 기반으로 데이터프레임 분리
+                    gender_group_dict = dict(tuple(df.groupby(['성별_명렬표', '선택과목']))) # {('성별', '과목명'): 데이터프레임}
+                    # 분리된 데이터프레임 각각 처리
+                    group_assign_df = pd.DataFrame()
+                    start_group_number = 0
+                    for (gender, subject), gender_subject_df in gender_group_dict.items():
+                        gender_subject_group_count = st.session_state['gender_subject_group_counts'].get((f'{gender}_{subject}'), 0)
+                        print(f"Gender: {gender}, Subject: {subject}, Count: {gender_subject_group_count}")
+                        gender_tuples = tuple_from_df(gender_subject_df, col_names)
+                        sorted_idx, sorted_x, final_bin_value = suitable_bin_value(gender_tuples, gender_subject_group_count)
+                        group_assign = init_group_assign(gender_tuples, gender_subject_group_count, final_bin_value)
+                        # 그룹 번호 조정
+                        group_assign = [g_n + start_group_number for g_n in group_assign]
+                        start_group_number = start_group_number + len(np.unique(group_assign))
+                        # group_assign과 gender_subject_df 병합
+                        gender_subject_df['초기그룹'] = group_assign
+                        group_assign_df = pd.concat([group_assign_df, gender_subject_df], axis=0)
+                    st.session_state['group_assign_df'] = group_assign_df
+                    group_assign_df.to_excel('group_assign_df.xlsx', index=False)
+                    st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
+                    # 그룹별로 결과 표시
+                    for group in st.session_state['full_group_names']:
+                        st.subheader(f"{group} 학생 목록")
+                        group_number = st.session_state['full_group_names'].index(group)
+                        group_students = group_assign_df[group_assign_df['초기그룹'] == group_number]
+                        st.dataframe(group_students, use_container_width=True)
+                elif st.session_state['sex_classification'] == '합반' and st.session_state['subject_based_classification'] == '아니오':
+                    # 적절한 bin_value 찾기
+                    sorted_idx, sorted_x, final_bin_value = suitable_bin_value(tuples, st.session_state['group_count'])
+                    # 초기 그룹 배정
+                    group_assign = init_group_assign(tuples, st.session_state['group_count'], final_bin_value)
+                    st.session_state['group_assign'] = group_assign
+                    # group_assign과 merged_df 병합
+                    group_assign_df = df.copy(deep=True)
+                    group_assign_df['초기그룹'] = group_assign
+                    st.session_state['group_assign_df'] = group_assign_df
+                    st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
+                    # 그룹별로 결과 표시
+                    for group in st.session_state['full_group_names']:
+                        st.subheader(f"{group} 학생 목록")
+                        group_number = st.session_state['full_group_names'].index(group)
+                        group_students = group_assign_df[group_assign_df['초기그룹'] == group_number]
+                        st.dataframe(group_students, use_container_width=True)
+                elif st.session_state['sex_classification'] == '합반' and st.session_state['subject_based_classification'] == '예':
+                    # 선택한 과목 기반으로 데이터프레임 분리
+                    subject_group_dict = dict(tuple(df.groupby('선택과목'))) # {'과목명': 데이터프레임}
+                    # 분리된 데이터프레임 각각 처리
+                    group_assign_df = pd.DataFrame()
+                    start_group_number = 0
+                    for subject, subject_df in subject_group_dict.items():
+                        subject_group_count = st.session_state['subject_group_counts'].get(subject, 0) # 과목별 그룹 수 가지고오기
+                        st.write(f"선택과목: {subject} 학생 수: {subject_df.shape[0]}", f"할당된 그룹 수: {subject_group_count}")
+                        subject_tuples = tuple_from_df(subject_df, col_names)
+                        sorted_idx, sorted_x, final_bin_value = suitable_bin_value(subject_tuples, subject_group_count)
+                        group_assign = init_group_assign(subject_tuples, subject_group_count, final_bin_value)
+                        # 그룹 번호 조정
+                        group_assign = [g_n + start_group_number for g_n in group_assign]
+                        start_group_number = start_group_number + len(np.unique(group_assign))
+                        # group_assign과 subject_df 병합
+                        subject_df['초기그룹'] = group_assign
+                        group_assign_df = pd.concat([group_assign_df, subject_df], axis=0)
+                    st.session_state['group_assign_df'] = group_assign_df
+                    st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
+                    # 그룹별로 결과 표시
+                    for group in st.session_state['full_group_names']:
+                        st.subheader(f"{group} 학생 목록")
+                        group_number = st.session_state['full_group_names'].index(group)
+                        group_students = group_assign_df[group_assign_df['초기그룹'] == group_number]
+                        st.dataframe(group_students, use_container_width=True)
+                else:
+                    st.error("그룹 분류에 필요한 설정이 올바르게 되어있는지 확인해주세요.")
+
+        except Exception as e:
+            st.error(f"그룹 분류 중 오류가 발생했습니다: {e}")
+
 
 
 # streamlit run c:/Users/USER/group_classification/pipeline_v2.0.py
