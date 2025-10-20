@@ -436,7 +436,7 @@ with tabs[3]:
         'merged_df': st.session_state.get('merged_df', pd.DataFrame()),
         'selected_algorithm': st.session_state.get('selected_algorithm', ''),
         'selected_sort_variable_dict': st.session_state.get('selected_sort_variable_dict', {}),
-        'selected_discrete_variable': st.session_state.get('selected_discrete_variable', {}),
+        'selected_discrete_variable': st.session_state.get('selected_discrete_variable', []), # 리스트로 담겨있음.
         'sex_classification': st.session_state.get('sex_classification', ''),
         'group_count': st.session_state.get('group_count', 0),
         'subject_based_classification': st.session_state.get('subject_based_classification', ''),
@@ -496,11 +496,13 @@ with tabs[3]:
                     group_assign_df['초기그룹'] = group_assign
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
+                    group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
                     # 그룹별로 결과 표시
                     for group in st.session_state['full_group_names']:
                         st.subheader(f"{group} 학생 목록")
                         group_number = st.session_state['full_group_names'].index(group)
                         group_students = group_assign_df[group_assign_df['초기그룹'] == group_number]
+                        st.write(f'학생수 : {group_students.shape[0]}, 평균 점수 : {round(group_students[col_names[-1]].mean(),2)}, 표준편차 : {round(group_students[col_names[-1]].std(),2)}')
                         st.dataframe(group_students, use_container_width=True)
                     #! 결시생을 어디서 처리할지 고민중
 
@@ -525,11 +527,13 @@ with tabs[3]:
                         group_assign_df = pd.concat([group_assign_df, subject_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
+                    group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
                     # 그룹별로 결과 표시
                     for group in st.session_state['full_group_names']:
                         st.subheader(f"{group} 학생 목록")
                         group_number = st.session_state['full_group_names'].index(group)
                         group_students = group_assign_df[group_assign_df['초기그룹'] == group_number]
+                        st.write(f'학생수 : {group_students.shape[0]}, 평균 점수 : {round(group_students[col_names[-1]].mean(),2)}, 표준편차 : {round(group_students[col_names[-1]].std(),2)}')
                         st.dataframe(group_students, use_container_width=True)
                     #! 결시생을 어디서 처리할지 고민중
 
@@ -553,11 +557,13 @@ with tabs[3]:
                         group_assign_df = pd.concat([group_assign_df, gender_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
+                    group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
                     # 그룹별로 결과 표시
                     for group in st.session_state['full_group_names']:
                         st.subheader(f"{group} 학생 목록")
                         group_number = st.session_state['full_group_names'].index(group)
                         group_students = group_assign_df[group_assign_df['초기그룹'] == group_number]
+                        st.write(f'학생수 : {group_students.shape[0]}, 평균 점수 : {round(group_students[col_names[-1]].mean(),2)}, 표준편차 : {round(group_students[col_names[-1]].std(),2)}')
                         st.dataframe(group_students, use_container_width=True)
                     #! 결시생을 어디서 처리할지 고민중
 
@@ -581,13 +587,14 @@ with tabs[3]:
                         gender_subject_df['초기그룹'] = group_assign
                         group_assign_df = pd.concat([group_assign_df, gender_subject_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
-                    group_assign_df.to_excel('group_assign_df.xlsx', index=False)
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
+                    group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
                     # 그룹별로 결과 표시
                     for group in st.session_state['full_group_names']:
                         st.subheader(f"{group} 학생 목록")
                         group_number = st.session_state['full_group_names'].index(group)
                         group_students = group_assign_df[group_assign_df['초기그룹'] == group_number]
+                        st.write(f'학생수 : {group_students.shape[0]}, 평균 점수 : {round(group_students[col_names[-1]].mean(),2)}, 표준편차 : {round(group_students[col_names[-1]].std(),2)}')
                         st.dataframe(group_students, use_container_width=True)
                 elif st.session_state['sex_classification'] == '합반' and st.session_state['subject_based_classification'] == '아니오':
                     # 적절한 bin_value 찾기
@@ -600,11 +607,13 @@ with tabs[3]:
                     group_assign_df['초기그룹'] = group_assign
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
+                    group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
                     # 그룹별로 결과 표시
                     for group in st.session_state['full_group_names']:
                         st.subheader(f"{group} 학생 목록")
                         group_number = st.session_state['full_group_names'].index(group)
                         group_students = group_assign_df[group_assign_df['초기그룹'] == group_number]
+                        st.write(f'학생수 : {group_students.shape[0]}, 평균 점수 : {round(group_students[col_names[-1]].mean(),2)}, 표준편차 : {round(group_students[col_names[-1]].std(),2)}')
                         st.dataframe(group_students, use_container_width=True)
                 elif st.session_state['sex_classification'] == '합반' and st.session_state['subject_based_classification'] == '예':
                     # 선택한 과목 기반으로 데이터프레임 분리
@@ -626,11 +635,13 @@ with tabs[3]:
                         group_assign_df = pd.concat([group_assign_df, subject_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
+                    group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
                     # 그룹별로 결과 표시
                     for group in st.session_state['full_group_names']:
                         st.subheader(f"{group} 학생 목록")
                         group_number = st.session_state['full_group_names'].index(group)
                         group_students = group_assign_df[group_assign_df['초기그룹'] == group_number]
+                        st.write(f'학생수 : {group_students.shape[0]}, 평균 점수 : {round(group_students[col_names[-1]].mean(),2)}, 표준편차 : {round(group_students[col_names[-1]].std(),2)}')
                         st.dataframe(group_students, use_container_width=True)
                 else:
                     st.error("그룹 분류에 필요한 설정이 올바르게 되어있는지 확인해주세요.")
