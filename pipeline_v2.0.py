@@ -40,6 +40,7 @@ if discrete_variable:
     st.session_state['discrete_variable'] = discrete_variable
     st.sidebar.success("변수 선택이 완료되었습니다.")
 else:
+    st.session_state['discrete_variable'] = []
     st.sidebar.warning("변수를 선택해주세요.")
 # =============== 본문 영역 ===============
 st.title("🔧 그룹 분류 파이프라인")
@@ -471,6 +472,7 @@ with tabs[3]:
         try:
             if all(k in st.session_state for k in ['merged_df', 'selected_algorithm', 'selected_sort_variable_dict', 'selected_discrete_variable', 'sex_classification', 'group_count', 'subject_based_classification', 'absent_student_handling', 'special_student_handling', 'school_based_classification', 'full_group_names']):
                 from init_group_assign import tuple_from_df, suitable_bin_value, init_group_assign
+                from cost_group_move import compute_ideal_discrete_freq, cost_group_move, compute_group_discrete_freq, compute_group_total_cost, compute_group_diff_and_sign, compute_continuous_cost, compute_discrete_cost
                 # 병합된 데이터프레임 불러오기
                 df = st.session_state['merged_df'] # 앞에서 결시생, 동명이인 처리까지 완료된 데이터프레임
                 if not st.session_state['absent_merged_df'].empty:
@@ -490,10 +492,12 @@ with tabs[3]:
                     sorted_idx, sorted_x, final_bin_value = suitable_bin_value(tuples, st.session_state['group_count'])
                     # 초기 그룹 배정
                     group_assign = init_group_assign(tuples, st.session_state['group_count'], final_bin_value)
-                    st.session_state['group_assign'] = group_assign
-                    # group_assign과 merged_df 병합
+                    # group_assign 데이터 프레임과 병합
                     group_assign_df = df.copy(deep=True)
                     group_assign_df['초기그룹'] = group_assign
+                    st.session_state['group_assign_df'] = group_assign_df
+                    # cost 함수 기반으로 그룹 배정 최적화
+                    group_assign_df = cost_group_move(100, 1e-6, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
                     group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
