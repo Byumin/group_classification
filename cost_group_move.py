@@ -393,17 +393,26 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
             # 이상적인 평균치 산출
             pop_mean = float(init_grouped_df[selected_sort_variable].mean())
             # 그룹별 총 불균형도 계산 <- 여기에 연속형뿐만 아니라 그룹 n크기도 반영해야됨.
-            group_total_cost = {}
+            group_abs_mean_cost = {}
             groups = init_grouped_df['초기그룹'].unique()
+            group_n_diff = {}
+            group_tanh = {} # softsign 또는 tahn 함수를 활용해서 방향성과 그 정도를 반영하는 방법도 고려해야함.
             for g in groups:
                 group_df = init_grouped_df[init_grouped_df['초기그룹'] == g]
                 group_mean = group_df[selected_sort_variable].mean()
-                group_total_cost[g] = pop_mean - group_mean # 양수면 이상치보다 적은 평균, 음수면 이상치보다 큰 평균
-            # group_total_cost 기준 이상치보다 제일 높은 평균의 그룹 탐색
-            source_group_idx = min(group_total_cost, key=group_total_cost.get)
+                group_mean_diff = abs(group_mean - pop_mean) # 절대값
+                group_n_diff[g] = len(group_df) - group_mean_size # 그룹의 크기를 방향성 있도록 반영
+                group_abs_mean_cost[g] = group_mean_diff # 그룹의 평균은 절대값으로 반영
+                group_tanh[g] = np.tanh(group_mean_size - len(group_df)) # 이상적 그룹 빈도보다 크면 +, 작으면 -, 같으면 0
+            # group_n_diff 높은 그룹 선택
+            print(group_n_diff)
+            source_group_idx = max(group_n_diff, key=group_n_diff.get) # 평균적인 그룹 크기보다 학생 수가 가장 많은 그룹 선택, 이상치와 같은 경우 0인 그룹도 선택됨
             print("이동할 그룹:", source_group_idx)
-            # group_total_cost 기준 이상치보다 하단에서 3개의 그룹 선택
-            match_group_idx = sorted(group_total_cost, key=group_total_cost.get, reverse=True)[:3] # 큰값 기준 3개
+            # 이동할 그룹과 n수가 반대 방향을 가지는 그룹 중 편차 큰 그룹 선택
+            target_tanh = -group_tanh[source_group_idx] # group_tanh 값이 0인 경우도 고려해야함.
+            match_group_tanh_idx = [g for g in group_tanh if group_tanh[g] == target_tanh] # 이동할 그룹과 반대 방향을 가지는 그룹들 <- 여기서 이동할 그룹은 제외됨
+            match_group_abs_cost_idx = {g: group_abs_mean_cost[g] for g in match_group_tanh_idx} # 반대 방향 그룹 중 평균 편차(절대값) 딕셔너리
+            match_group_idx = sorted(match_group_abs_cost_idx, key=match_group_abs_cost_idx.get, reverse=True)[:3] # 반대 방향 그룹 중 평균 편차 큰 상위 3개 그룹 선택
             print("매칭 그룹:", set(match_group_idx))
             print("##############################")
             source_group_df = init_grouped_df[init_grouped_df['초기그룹']==source_group_idx]
@@ -413,23 +422,26 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
             for s_idx, s_row in source_group_df.iterrows():
                 for t_idx, t_row in target_group_df.iterrows():
                     # 여기서 s_row와 t_row를 비교하여 교환 가능성을 탐색
-                    # 혹시 모르니 조건 설정
+                    # 혹시 모르니 그룹이 같으면 생략 조건 설정 
                     if s_row['초기그룹'] == t_row['초기그룹']:
                         continue
-                    elif len(source_group_df) <= len(target_group_df): # 이동하는 그룹의 수보다 도착 그룹의 수가 더 많거나 같으면 비용계산 X
-                        continue
+                    #elif len(source_group_df) <= len(target_group_df): # 이동하는 그룹의 수보다 도착 그룹의 수가 더 많거나 같으면 비용계산 X -> 앞에서 적은 그룹은 많은 그룹 이동을 방지하도록 설정했으니 이 조건은 불필요
+                    #    continue
+                    elif len(source_group_df) == len(target_group_df):
+                        cont_cost = compute_continuous_cost(init_grouped_df, s_row, t_row, selected_sort_variable)
+                    else:
                     # 연속형 변수 비용 계산
-                    cont_cost = compute_continuous_cost(init_grouped_df, s_row, t_row, selected_sort_variable)
-                    size_penalty = abs(group_sizes[s_row['초기그룹']] - group_mean_size) + abs(group_sizes[t_row['초기그룹']] - group_mean_size)
+                        cont_cost = compute_continuous_cost(init_grouped_df, s_row, t_row, selected_sort_variable)
+                        size_penalty = abs(group_sizes[s_row['초기그룹']] - group_mean_size) + abs(group_sizes[t_row['초기그룹']] - group_mean_size)
                     # 총 비용 계산
-                    print(f"쌍 ({s_idx}, {t_idx}) 연속형 비용: {cont_cost}, 크기 패널티: {size_penalty}")
                     total_cost = w_continuous * cont_cost + 100 * size_penalty
+                    print(f"쌍 ({s_idx}, {t_idx}) 연속형 비용: {cont_cost}, 크기 패널티: {size_penalty}, 총 비용: {total_cost}")
                     pair_costs[(s_idx, t_idx)] = total_cost
             # 최대 비용 쌍 선택
             best_pair = max(pair_costs, key=lambda x: pair_costs[x])
             best_cost = pair_costs[best_pair]
             print("최고 효율 쌍:", best_pair)
-            print("비용:", best_cost)
+            print("비용:", best_cost) # 먼가 이상한데
             # 실제 그룹 이동
             idx_s, idx_t = best_pair
             # 그룹 실제 이동하는거 확인
