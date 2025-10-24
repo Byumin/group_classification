@@ -1,4 +1,4 @@
-def tuple_from_df(df, col_names):
+def tuple_from_df(df, col_names): # lexsort에 넣을 튜플 생성 함수 (조건부 정렬용)
     '''
     df : pandas dataframe
     col_names : 고려해야할 변수명, 리스트 형태로 입력 (예:['x1'], ['x1', 'x2'])
