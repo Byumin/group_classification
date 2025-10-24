@@ -688,3 +688,4 @@ with tabs[4]:
 
 # streamlit run c:/Users/USER/group_classification/pipeline_v2.0.py
 # streamlit run /Users/mac/insight_/group_classification/pipeline_v2.0.py
+# 왜 동기화가 안되냐
