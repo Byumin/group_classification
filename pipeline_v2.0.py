@@ -490,6 +490,7 @@ with tabs[3]:
 
                 # 남학교 or 여학교-의미없음-선택과목없음
                 if st.session_state['sex_classification'] in ['남학교', '여학교'] and st.session_state['subject_based_classification'] == '아니오':
+                    print('남학교 or 여학교, 합반, 선택과목 없음으로 성별 비율 균형 고려하여 그룹 배정 시작')
                     # 적절한 bin_value 찾기
                     sorted_idx, sorted_x, final_bin_value = suitable_bin_value(tuples, st.session_state['group_count'])
                     # 초기 그룹 배정
@@ -499,7 +500,7 @@ with tabs[3]:
                     group_assign_df['초기그룹'] = group_assign
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
-                    group_assign_df = cost_group_move(100, 5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move(100, 1, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
                     group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
@@ -514,6 +515,7 @@ with tabs[3]:
 
                 # 남학교 or 여학교-의미없음-선택과목있음
                 elif st.session_state['sex_classification'] in ['남학교', '여학교'] and st.session_state['subject_based_classification'] == '예' and st.session_state['subject_group_counts']:
+                    print('남학교 or 여학교, 합반, 선택과목 있음으로 성별 비율 균형 고려하여 그룹 배정 시작')
                     # 선택한 과목 기반으로 데이터프레임 분리
                     subject_group_dict = dict(tuple(df.groupby('선택과목'))) # {'과목명': 데이터프레임}
                     # 분리된 데이터프레임 각각 처리
@@ -533,7 +535,7 @@ with tabs[3]:
                         group_assign_df = pd.concat([group_assign_df, subject_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
-                    group_assign_df = cost_group_move(100, 5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move(100, 1, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
                     group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 그룹 배정 저장
@@ -548,6 +550,7 @@ with tabs[3]:
 
                 # 남여공학-분반-선택과목없음
                 elif st.session_state['sex_classification'] == '분반' and st.session_state['subject_based_classification'] == '아니오':
+                    print('남여공학, 분반, 선택과목 없음으로 성별 비율 균형 고려하여 그룹 배정 시작')
                     # 선택한 과목 기반으로 데이터프레임 분리
                     gender_group_dict = dict(tuple(df.groupby('성별_명렬표'))) # {'성별': 데이터프레임}
                     # 분리된 데이터프레임 각각 처리
@@ -565,8 +568,8 @@ with tabs[3]:
                         gender_df['초기그룹'] = group_assign
                         group_assign_df = pd.concat([group_assign_df, gender_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
-                    # cost 함수 기반으로 그룹 배정 최적화
-                    group_assign_df = cost_group_move(100, 5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    # cost 함수 기반으로 그룹 배정 최적화 -> 이게 남여가 합처진 df에서 돌아가 남여가 이동되는 문제가 발생...
+                    group_assign_df = cost_group_move(100, 1, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
                     group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 그룹 배정 저장
@@ -581,6 +584,7 @@ with tabs[3]:
 
                 # 남여공학-분반-선택과목있음
                 elif st.session_state['sex_classification'] == '분반' and st.session_state['subject_based_classification'] == '예':
+                    print('남여공학, 분반, 선택과목 있음으로 성별 비율 균형 고려하여 그룹 배정 시작')
                     # 성별, 선택한 과목 기반으로 데이터프레임 분리
                     gender_group_dict = dict(tuple(df.groupby(['성별_명렬표', '선택과목']))) # {('성별', '과목명'): 데이터프레임}
                     # 분리된 데이터프레임 각각 처리
@@ -599,8 +603,8 @@ with tabs[3]:
                         gender_subject_df['초기그룹'] = group_assign
                         group_assign_df = pd.concat([group_assign_df, gender_subject_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
-                    # cost 함수 기반으로 그룹 배정 최적화
-                    group_assign_df = cost_group_move(100, 5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    # cost 함수 기반으로 그룹 배정 최적화 -> 이게 남여가 합처진 df에서 돌아가 남여가 이동되는 문제가 발생...
+                    group_assign_df = cost_group_move(100, 1, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
                     group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
@@ -625,7 +629,7 @@ with tabs[3]:
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
                     print('초기 배정 병합 후 이산형 변수 열 확인', )
-                    group_assign_df = cost_group_move(100, 5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move(100, 1, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
                     group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
@@ -638,6 +642,7 @@ with tabs[3]:
                         st.dataframe(group_students, use_container_width=True)
 
                 elif st.session_state['sex_classification'] == '합반' and st.session_state['subject_based_classification'] == '예':
+                    print('남여공학, 합반, 선택과목 있음으로 성별 비율 균형 고려하여 그룹 배정 시작')
                     # 선택한 과목 기반으로 데이터프레임 분리
                     subject_group_dict = dict(tuple(df.groupby('선택과목'))) # {'과목명': 데이터프레임}
                     # 분리된 데이터프레임 각각 처리
@@ -648,16 +653,15 @@ with tabs[3]:
                         st.write(f"선택과목: {subject} 학생 수: {subject_df.shape[0]}", f"할당된 그룹 수: {subject_group_count}")
                         subject_tuples = tuple_from_df(subject_df, col_names)
                         sorted_idx, sorted_x, final_bin_value = suitable_bin_value(subject_tuples, subject_group_count)
-                        group_assign = init_group_assign(subject_tuples, subject_group_count, final_bin_value)
+                        subject_group_assign = init_group_assign(subject_tuples, subject_group_count, final_bin_value)
                         # 그룹 번호 조정
-                        group_assign = [g_n + start_group_number for g_n in group_assign]
-                        start_group_number = start_group_number + len(np.unique(group_assign))
+                        subject_group_assign = [g_n + start_group_number for g_n in subject_group_assign]
+                        start_group_number = start_group_number + len(np.unique(subject_group_assign))
                         # group_assign과 subject_df 병합
-                        subject_df['초기그룹'] = group_assign
-                        group_assign_df = pd.concat([group_assign_df, subject_df], axis=0)
-                    st.session_state['group_assign_df'] = group_assign_df
-                    # cost 함수 기반으로 그룹 배정 최적화
-                    group_assign_df = cost_group_move(100, 0.1, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                        subject_group_assign_df['초기그룹'] = subject_group_assign
+                        # cost 함수 기반으로 그룹 배정 최적화
+                        subject_group_assign_df = cost_group_move(100, 1, 100, 1, subject_group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                        group_assign_df = pd.concat([group_assign_df, subject_group_assign_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
                     group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장

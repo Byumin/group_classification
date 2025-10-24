@@ -33,7 +33,6 @@ def compute_ideal_discrete_freq(init_grouped_df, selected_discrete_variable):
       각 그룹의 이상적인 남학생 수는 35 / 2 = 17.5명.
     """
 
-    import pandas as pd
     try:
         # ✅ 그룹 개수 확인 (전체 그룹이 몇 개인지)
         groups = init_grouped_df['초기그룹'].unique()
@@ -93,7 +92,6 @@ def compute_group_discrete_freq(init_grouped_df, selected_discrete_variable):
     - 즉, “현재 그룹 구성에서 실제로 각 범주 값이 몇 명씩 있는가”를 확인합니다.
     """
 
-    import pandas as pd
     try:
         # ✅ 고유한 그룹 목록 추출
         groups = init_grouped_df['초기그룹'].unique()
@@ -176,7 +174,7 @@ def compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable)
                 for key, ideal_count in ideal_freq['population'][var].items():
                     # 해당 범주의 실제 빈도를 가져오되 없으면 0으로 처리
                     actual_count = group_freq[g][var].get(key, 0)
-                    diff = abs(ideal_count - actual_count)
+                    diff = ideal_count - actual_count # 이걸 절대값으로 계산해야하나? 뭔지 모르겠네
 
                     # 절댓값으로 편차 누적
                     total_cost += diff
@@ -187,8 +185,6 @@ def compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable)
         print("Error during compute_group_total_cost execution:", str(e))
         raise e
     return group_total_cost
-
-import numpy as np
 
 def compute_group_diff_and_sign(ideal_freq, group_freq, selected_discrete_variable):
     """
@@ -243,6 +239,7 @@ def compute_group_diff_and_sign(ideal_freq, group_freq, selected_discrete_variab
     - swap 후보 탐색 시,
       sign이 반대인 그룹끼리 교환 가능성 탐색에 활용함.
     """
+    import numpy as np
 
     group_diff_cost = {}
     try:
@@ -522,13 +519,14 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
             print("이전 그룹별 이산형 변수 빈도수:")
             print(group_freq)
             prev_disc_cost = compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable) # 각 그룹별 이산형 총 불균형도
+            prev_disc_cost = {k: abs(v) for k, v in prev_disc_cost.items()} # 절대값 변환
             print("이전 그룹별 이산형 불균형도:")
             print(prev_disc_cost)
             prev_disc_total_cost = sum(prev_disc_cost.values())
             print(f"이전 이산형 총 불균형도: {prev_disc_total_cost}")
             print(f"이전 연속형 비용: {prev_diff_cost}, 이전 이산형 비용: {prev_disc_total_cost}")
             print(w_discrete)
-            prev_total_cost = prev_diff_cost + w_discrete * prev_disc_total_cost
+            prev_total_cost = prev_diff_cost + prev_disc_total_cost
             print(f"이전 총 비용: {prev_total_cost}")
 
             for iter_num in range(max_iter):
@@ -636,8 +634,9 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
                 new_diff_cost = sum([abs(gm - new_pop_mean) for gm in new_group_mean]) # 그룹 별 평균과 전체 평균의 차이의 절대값 합
                 group_freq = compute_group_discrete_freq(init_grouped_df, selected_discrete_variable)
                 new_disc_cost = compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable) # 각 그룹별 이산형 총 불균형도
+                new_disc_cost = {k: abs(v) for k, v in new_disc_cost.items()} # 절대값 변환
                 new_disc_total_cost = sum(new_disc_cost.values())
-                new_total_cost = new_diff_cost + w_discrete * new_disc_total_cost
+                new_total_cost = new_diff_cost + new_disc_total_cost
                 print(f"이전 총 비용: {prev_total_cost}, 새로운 총 비용: {new_total_cost}")
                 # 비용 개선폭 계산
                 improvement = abs(prev_total_cost - new_total_cost)
@@ -649,7 +648,7 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
                 if improvement < tolerance:
                     print("개선 폭이 작아 중단합니다.")
                     break
-                prev_total_cost = best_cost
+                prev_total_cost = new_total_cost
     except Exception as e:
         print("Error during cost_group_move execution:", str(e))
         raise e
