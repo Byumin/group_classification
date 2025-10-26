@@ -384,6 +384,10 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
     print(f"max_iter: {max_iter}, tolerance: {tolerance}, w_discrete: {w_discrete}, w_continuous: {w_continuous}")
     print(f"selected_discrete_variable: {selected_discrete_variable}, selected_sort_variable: {selected_sort_variable_dict}")
     try:
+        # 그룹이 하나만 있는 경우 바로 반환
+        if init_grouped_df['초기그룹'].nunique() == 1:
+            print("그룹이 하나만 있어 바로 반환합니다.")
+            return init_grouped_df
         # -------------------------------------------------
         # 이산형 변수를 선택하지 않은 경우
         # -------------------------------------------------
