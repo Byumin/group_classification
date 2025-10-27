@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
+import numpy as np # xlsxwriter 설치 필요 (다른 환경에서)
+import io
 
 st.set_page_config(page_title="그룹 분류 파이프라인", layout="wide")
 # 사이드바 메뉴
@@ -354,6 +355,7 @@ with tabs[3]:
     subject_based_classification = st.radio(
         "과목 기반 분류를 선택하세요",
         options=["예", "아니오"],
+        index=1,
         help="학생 명렬표에 선택 과목에 대한 정보가 있는 경우 처리 가능합니다."
     )
     st.session_state['subject_based_classification'] = subject_based_classification
@@ -409,6 +411,7 @@ with tabs[3]:
     special_student_handling = st.radio(
         "특수 학생을 그룹별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
+        index=1,
         help="학생 명렬표에 특수 학생에 대한 정보가 있는 경우 처리 가능합니다."
     )
     st.session_state['special_student_handling'] = special_student_handling
@@ -418,6 +421,7 @@ with tabs[3]:
     school_based_classification = st.radio(
         "출신 학교을 고려해 그룹별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
+        index=1,
         help="학생 명렬표에 출신 학교에 대한 정보가 있는 경우 처리 가능합니다."
     )
     st.session_state['school_based_classification'] = school_based_classification
@@ -699,6 +703,7 @@ with tabs[3]:
             assign_absent_rows = []
             current_group_counts = group_assign_df['초기그룹'].value_counts().to_dict()
             if st.session_state['absent_student_handling'] in ['예', '아니오'] and not st.session_state['absent_merged_df'].empty: # 결시생 있고 골고루 배정 원할 때
+                st.info("결시생이 존재하여 그룹별로 균형있게 배정 중입니다...")
                 absent_df = st.session_state['absent_merged_df']
                 group_assign_df = st.session_state['group_assign_df']
                 selected_discrete_variable = st.session_state.get('selected_discrete_variable', [])
@@ -760,7 +765,7 @@ with tabs[3]:
                         current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
                     # 합반 + 선택과목 없음
                     elif st.session_state['sex_classification'] == '합반' and st.session_state['subject_based_classification'] == '아니오':
-                        condition = pd.Series([True] * group_assign_df.shape[0])
+                        condition = pd.Series([True] * group_assign_df.shape[0], index=group_assign_df.index) # 그룹 배정 인덱스와 일치화
                         filtered_df = group_assign_df[condition]
                         if filtered_df.empty:
                             candidate_groups = list(current_group_counts.keys())
@@ -796,7 +801,7 @@ with tabs[3]:
                         current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
                     # 남학교 or 여학교 + 선택과목 없음
                     elif st.session_state['sex_classification'] in ['남학교', '여학교'] and st.session_state['subject_based_classification'] == '아니오':
-                        condition = pd.Series([True] * group_assign_df.shape[0])
+                        condition = pd.Series([True] * group_assign_df.shape[0], index=group_assign_df.index) # 그룹 배정 인덱스와 일치화
                         filtered_df = group_assign_df[condition]
                         if filtered_df.empty:
                             candidate_groups = list(current_group_counts.keys())
@@ -822,11 +827,13 @@ with tabs[3]:
                 group_assign_df = st.session_state['group_assign_df']
                 group_assign_df = pd.concat([group_assign_df, absent_df], ignore_index=True)
                 st.session_state['group_assign_df'] = group_assign_df
+                group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
 
             # 특수학생 처리
             special_student_rows = []
             current_group_counts = group_assign_df['초기그룹'].value_counts().to_dict()
             if st.session_state['special_student_handling'] in ['예', '아니오'] and not st.session_state['special_student_df'].empty: # 결시생 있고 골고루 배정 원할 때
+                st.info("특수학생이 존재하여 그룹별로 균형있게 배정 중입니다...")
                 special_student_df = st.session_state['special_student_df']
                 group_assign_df = st.session_state['group_assign_df']
                 selected_discrete_variable = st.session_state.get('selected_discrete_variable', [])
@@ -888,7 +895,7 @@ with tabs[3]:
                         current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
                     # 합반 + 선택과목 없음
                     elif st.session_state['sex_classification'] == '합반' and st.session_state['subject_based_classification'] == '아니오':
-                        condition = pd.Series([True] * group_assign_df.shape[0])
+                        condition = pd.Series([True] * group_assign_df.shape[0], index=group_assign_df.index) # 그룹 배정 인덱스와 일치화
                         filtered_df = group_assign_df[condition]
                         if filtered_df.empty:
                             candidate_groups = list(current_group_counts.keys())
@@ -924,7 +931,7 @@ with tabs[3]:
                         current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
                     # 남학교 or 여학교 + 선택과목 없음
                     elif st.session_state['sex_classification'] in ['남학교', '여학교'] and st.session_state['subject_based_classification'] == '아니오':
-                        condition = pd.Series([True] * group_assign_df.shape[0])
+                        condition = pd.Series([True] * group_assign_df.shape[0], index=group_assign_df.index) # 그룹 배정 인덱스와 일치화
                         filtered_df = group_assign_df[condition]
                         if filtered_df.empty:
                             candidate_groups = list(current_group_counts.keys())
@@ -950,24 +957,119 @@ with tabs[3]:
                 group_assign_df = st.session_state['group_assign_df']
                 group_assign_df = pd.concat([group_assign_df, special_student_df], ignore_index=True)
                 st.session_state['group_assign_df'] = group_assign_df
+                group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
 
             #  출신 학교 기반 그룹 배정은 추후 개발
 
         except Exception as e:
             st.error(f"그룹 분류 중 오류가 발생했습니다: {e}")
 
-# [4] 학생 관계 배정
+# [4] 학생 관계 배정-------------------------------------------------
 with tabs[4]:
     st.subheader("학생 관계 재배정")
     st.write("학생 간의 관계를 고려하여 기존 그룹 배정을 조정합니다.")
-    relationship_file = st.file_uploader("학생 관계 파일 업로드하세요", type=["xlsx"])
-    # 파일 업로드 시
-    if relationship_file:
-        relationship_df = pd.read_excel(relationship_file)
-        st.session_state['relationship_df'] = relationship_df
-        st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
-    else:
-        st.sidebar.warning("학생 관계 특성이 없는것으로 진행됩니다.")
+
+    # 주체 및 대상 검색 후 선택 및 설정
+    if 'group_assign_df' in st.session_state:
+        df = st.session_state['group_assign_df']
+        all_students = sorted(df['merge_key'].unique().tolist())
+
+        # 세션 초기화
+        if 'relationship_dict' not in st.session_state:
+            st.session_state['relationship_dict'] = {}
+
+        # 🔍 1️⃣ 주체 학생 검색 및 선택
+        st.markdown("##### ① 관계를 설정할 학생 선택")
+        search_main = st.text_input("주체 학생 이름 검색")
+        filtered_main = [s for s in all_students if search_main in s] if search_main else all_students
+
+        selected_main = st.selectbox(
+            "주체 학생 선택 (학년+반+번호+이름)",
+            options=filtered_main,
+            help="검색 후 관계를 설정할 학생을 선택하세요."
+        )
+
+        if selected_main:
+            # 🔍 2️⃣ 대상 학생 검색 및 필터링
+            st.markdown(f"##### ② **{selected_main}** 학생과의 관계 설정")
+            search_target = st.text_input("대상 학생 이름 검색")
+            target_candidates = [s for s in all_students if s != selected_main]
+            filtered_targets = [s for s in target_candidates if search_target in s] if search_target else target_candidates
+
+            if not filtered_targets:
+                st.warning("검색 결과가 없습니다.")
+            else:
+                relations = st.session_state['relationship_dict'].get(selected_main, {})
+
+                # 🎚 대상 학생별 관계 선택
+                for target in filtered_targets:
+                    prev_value = relations.get(target, 0)
+                    options = {"무관": 0, "같은 반": 1, "다른 반": -1}
+                    reverse_options = {v: k for k, v in options.items()}
+                    try:
+                        init_index = list(options.values()).index(int(prev_value))
+                    except:
+                        init_index = 0  # 기본 "무관"
+                    relation = st.selectbox(
+                        f"{selected_main} ↔ {target}",
+                        options=list(options.keys()),
+                        index=init_index,
+                        key=f"{selected_main}_{target}",
+                    )
+                    relations[target] = options[relation]
+
+                # 💾 관계 저장 버튼
+                if st.button(f"💾 {selected_main}의 관계 저장"):
+                    st.session_state['relationship_dict'][selected_main] = relations
+                    print(st.session_state['relationship_dict'])
+                    st.success(f"{selected_main}의 관계가 저장되었습니다.")
+
+        # 📊 관계 현황 보기
+        st.markdown("#### ③ 현재까지 저장된 관계 요약 및 관리")
+        if st.session_state['relationship_dict']:
+            rel_df = pd.DataFrame.from_dict(st.session_state['relationship_dict'], orient='index').fillna(0)
+            st.dataframe(rel_df, use_container_width=True)
+
+            col1, col2 = st.columns([1, 1])
+
+            # ❌ 특정 학생 관계 삭제
+            st.markdown("##### 특정 학생 관계 삭제")
+            delete_student = st.selectbox(
+                "관계를 삭제할 학생 선택",
+                options=["(선택 없음)"] + list(st.session_state['relationship_dict'].keys())
+            )
+            if delete_student != "(선택 없음)" and st.button("❌ 선택한 학생 관계 삭제"):
+                del st.session_state['relationship_dict'][delete_student]
+                st.warning(f"{delete_student}의 관계가 삭제되었습니다.")
+            # 🧹 전체 초기화 버튼
+            if st.button("🧹 모든 관계 초기화"):
+                st.session_state['relationship_dict'].clear()
+                st.warning("모든 관계가 초기화되었습니다.")
+
+        else:
+            st.info("아직 저장된 관계가 없습니다. 학생을 선택해 관계를 설정하세요.")
+        
+        st.divider()
+        # 그룹 재배정 버튼
+        if st.button("🔄 관계 기반 그룹 재배정 실행"):
+            if 'group_assign_df' in st.session_state:
+                group_assign_df = st.session_state['group_assign_df']
+                # 그룹 재배정 로직 구현
+                '''
+                앞에서 설정한 학생 간 관계(주체, 대상)을 바탕으로 편성된 그룹에서 잘못된 관계를 찾는 것이 우선
+                그런 다음 대상을 다른 그룹으로 이동시키는 방식으로 재배정 수행
+                1. 같은 반이어야 한다.
+                대상을 주체와 같은 반으로 이동시키는 시뮬레이션 수행
+                비용함수는 위와 같은 방식으로 산출
+                2. 다른 반이어야 한다.
+                대상을 주체와 다른 반으로 이동시키는 시뮬레이션 수행
+                다른 반으로 이동시킬 때 모든 그룹을 탐색하기에는 비용이 크므로
+                후보 그룹을 선정할 수 있는 기준이 필요
+                그 뒤에 비용함수 산출
+                '''
+                st.success("그룹 재배정이 완료되었습니다.")
+            else:
+                st.warning("먼저 그룹 배정(group_assign_df)을 생성해주세요.")
 
 # [5] 분포 시각화
 with tabs[5]:
