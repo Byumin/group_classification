@@ -333,7 +333,6 @@ def compute_discrete_cost(group_diff_cost, s_row, t_row, selected_discrete_varia
         # 학생 단위 이동 허용 여부 판단
         # -------------------------------------------------
         move_allowed = False  # 기본값: 이동 불가
-
         for var in selected_discrete_variable:
             source_cat = s_row[var]
             sign_val = group_diff_cost[source_group][f'{var}_sign'][source_cat]
@@ -380,7 +379,7 @@ def compute_discrete_cost(group_diff_cost, s_row, t_row, selected_discrete_varia
     return discrete_cost_change
 
 def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_df, selected_discrete_variable, selected_sort_variable_dict):
-    print("cost_group_move 인자 확인")
+    print("cost_group_move 인자 확인메롱")
     print(f"max_iter: {max_iter}, tolerance: {tolerance}, w_discrete: {w_discrete}, w_continuous: {w_continuous}")
     print(f"selected_discrete_variable: {selected_discrete_variable}, selected_sort_variable: {selected_sort_variable_dict}")
     try:
@@ -530,7 +529,7 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
             print(f"이전 이산형 총 불균형도: {prev_disc_total_cost}")
             print(f"이전 연속형 비용: {prev_diff_cost}, 이전 이산형 비용: {prev_disc_total_cost}")
             print(w_discrete)
-            prev_total_cost = prev_diff_cost + prev_disc_total_cost
+            prev_total_cost = prev_diff_cost + 10 * prev_disc_total_cost
             print(f"이전 총 비용: {prev_total_cost}")
 
             for iter_num in range(max_iter):
@@ -640,7 +639,7 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
                 new_disc_cost = compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable) # 각 그룹별 이산형 총 불균형도
                 new_disc_cost = {k: abs(v) for k, v in new_disc_cost.items()} # 절대값 변환
                 new_disc_total_cost = sum(new_disc_cost.values())
-                new_total_cost = new_diff_cost + new_disc_total_cost
+                new_total_cost = new_diff_cost + 10 * new_disc_total_cost
                 print(f"이전 총 비용: {prev_total_cost}, 새로운 총 비용: {new_total_cost}")
                 # 비용 개선폭 계산
                 improvement = abs(prev_total_cost - new_total_cost)
