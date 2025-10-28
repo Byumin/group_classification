@@ -335,6 +335,7 @@ def compute_discrete_cost(group_diff_cost, s_row, t_row, selected_discrete_varia
         move_allowed = False  # 기본값: 이동 불가
         for var in selected_discrete_variable:
             source_cat = s_row[var]
+            print(f"변수: {var}, 출발 그룹: {source_group}, 도착 그룹: {target_group}, 카테고리: {source_cat}")
             sign_val = group_diff_cost[source_group][f'{var}_sign'][source_cat]
 
             if sign_val > 0:  # 부족 상태면 즉시 이동 금지
@@ -447,6 +448,10 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
                 for s_idx, s_row in source_group_df.iterrows():
                     for t_idx, t_row in target_group_df.iterrows():
                         # 여기서 s_row와 t_row를 비교하여 교환 가능성을 탐색
+                        #! 그룹 고정된 학생이면 교환 계산에서 생략
+                        if s_row.get('그룹고정', False) or t_row.get('그룹고정', False):
+                            continue
+
                         # 혹시 모르니 그룹이 같으면 생략 조건 설정 
                         if s_row['초기그룹'] == t_row['초기그룹']:
                             continue
@@ -606,6 +611,10 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
                 for s_idx, s_row in source_group_df.iterrows():
                     for t_idx, t_row in target_group_df.iterrows():
                         # 여기서 s_row와 t_row를 비교하여 교환 가능성을 탐색
+                        #! 그룹 고정된 학생이면 교환 계산에서 생략
+                        if s_row.get('그룹고정', False) or t_row.get('그룹고정', False):
+                            continue
+                        
                         # 혹시 모르니 조건 설정
                         if s_row['초기그룹'] == t_row['초기그룹']:
                             continue
