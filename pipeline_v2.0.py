@@ -429,7 +429,7 @@ with tabs[3]:
     if st.session_state.get('group_count', 0) > 0:
         full_group_names = []
         for i in range(st.session_state['group_count']):
-            group_name = st.text_input(f"집단 {i+1}의 이름을 입력하세요", value=f"Group {i+1}")
+            group_name = st.text_input(f"집단 {i+1}의 이름을 입력하세요", value=f"{i+1} 반")
             full_group_names.append(group_name)
         st.session_state['full_group_names'] = full_group_names
     else:
@@ -699,6 +699,136 @@ with tabs[3]:
                     st.error("그룹 분류에 필요한 설정이 올바르게 되어있는지 확인해주세요.")
             else:
                 st.error("그룹 분류에 필요한 설정이 올바르게 되어있는지 확인해주세요.")
+
+            # 결시생 처리 (그룹별 골고루 배정)
+            assign_absent_rows = []
+            current_group_counts = group_assign_df['초기그룹'].value_counts().to_dict()
+            if st.session_state['absent_student_handling'] in ['예', '아니오'] and not st.session_state['absent_merged_df'].empty: # 결시생 있고 골고루 배정 원할 때
+                st.info("결시생이 존재하여 그룹별로 균형있게 배정 중입니다...")
+                absent_df = st.session_state['absent_merged_df']
+                group_assign_df = st.session_state['group_assign_df']
+                selected_discrete_variable = st.session_state.get('selected_discrete_variable', [])
+                for idx, row in absent_df.iterrows():
+                    # 조건 설정 (성별, 선택과목)
+                    # 분반 + 선택과목 있음
+                    if st.session_state['sex_classification'] == '분반' and st.session_state['subject_based_classification'] == '예':
+                        condition = ((group_assign_df['성별_명렬표'] == row['성별_명렬표']) &(group_assign_df['선택과목'] == row['선택과목']))
+                        filtered_df = group_assign_df[condition]
+                        if filtered_df.empty:
+                            candidate_groups = list(current_group_counts.keys())
+                        else:
+                            candidate_groups = filtered_df['초기그룹'].unique().tolist()
+                        # 후보 그룹별 현재 인원 딕셔너리 생성
+                        candidate_counts = {g: current_group_counts.get(g, 0) for g in candidate_groups}
+                        # 인원 오름차순으로 정렬
+                        sorted_groups = sorted(candidate_counts, key=candidate_counts.get)
+                        # 인원 오름차순에 따라 결시생 순환 배정
+                        target_group = sorted_groups[idx % len(sorted_groups)]
+                        # 배정 및 인원수 업데이트
+                        row['초기그룹'] = target_group
+                        assign_absent_rows.append(row)
+                        current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
+                    # 분반 + 선택과목 없음
+                    elif st.session_state['sex_classification'] == '분반' and st.session_state['subject_based_classification'] == '아니오':
+                        condition = (group_assign_df['성별_명렬표'] == row['성별_명렬표'])
+                        filtered_df = group_assign_df[condition]
+                        if filtered_df.empty:
+                            candidate_groups = list(current_group_counts.keys())
+                        else:
+                            candidate_groups = filtered_df['초기그룹'].unique().tolist()
+                        # 후보 그룹별 현재 인원 딕셔너리 생성
+                        candidate_counts = {g: current_group_counts.get(g, 0) for g in candidate_groups}
+                        # 인원 오름차순으로 정렬
+                        sorted_groups = sorted(candidate_counts, key=candidate_counts.get)
+                        # 인원 오름차순에 따라 결시생 순환 배정
+                        target_group = sorted_groups[idx % len(sorted_groups)]
+                        # 배정 및 인원수 업데이트
+                        row['초기그룹'] = target_group
+                        assign_absent_rows.append(row)
+                        current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
+                    # 합반 + 선택과목 있음
+                    elif st.session_state['sex_classification'] == '합반' and st.session_state['subject_based_classification'] == '예':
+                        condition = ((group_assign_df['선택과목'] == row['선택과목']))
+                        filtered_df = group_assign_df[condition]
+                        if filtered_df.empty:
+                            candidate_groups = list(current_group_counts.keys())
+                        else:
+                            candidate_groups = filtered_df['초기그룹'].unique().tolist()
+                        # 후보 그룹별 현재 인원 딕셔너리 생성
+                        candidate_counts = {g: current_group_counts.get(g, 0) for g in candidate_groups}
+                        # 인원 오름차순으로 정렬
+                        sorted_groups = sorted(candidate_counts, key=candidate_counts.get)
+                        # 인원 오름차순에 따라 결시생 순환 배정
+                        target_group = sorted_groups[idx % len(sorted_groups)]
+                        # 배정 및 인원수 업데이트
+                        row['초기그룹'] = target_group
+                        assign_absent_rows.append(row)
+                        current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
+                    # 합반 + 선택과목 없음
+                    elif st.session_state['sex_classification'] == '합반' and st.session_state['subject_based_classification'] == '아니오':
+                        condition = pd.Series([True] * group_assign_df.shape[0], index=group_assign_df.index) # 그룹 배정 인덱스와 일치화
+                        filtered_df = group_assign_df[condition]
+                        if filtered_df.empty:
+                            candidate_groups = list(current_group_counts.keys())
+                        else:
+                            candidate_groups = filtered_df['초기그룹'].unique().tolist()
+                        # 후보 그룹별 현재 인원 딕셔너리 생성
+                        candidate_counts = {g: current_group_counts.get(g, 0) for g in candidate_groups}
+                        # 인원 오름차순으로 정렬
+                        sorted_groups = sorted(candidate_counts, key=candidate_counts.get)
+                        # 인원 오름차순에 따라 결시생 순환 배정
+                        target_group = sorted_groups[idx % len(sorted_groups)]
+                        # 배정 및 인원수 업데이트
+                        row['초기그룹'] = target_group
+                        assign_absent_rows.append(row)
+                        current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
+                    # 남학교 or 여학교 + 선택과목 있음
+                    elif st.session_state['sex_classification'] in ['남학교', '여학교'] and st.session_state['subject_based_classification'] == '예':
+                        condition = (group_assign_df['선택과목'] == row['선택과목'])
+                        filtered_df = group_assign_df[condition]
+                        if filtered_df.empty:
+                            candidate_groups = list(current_group_counts.keys())
+                        else:
+                            candidate_groups = filtered_df['초기그룹'].unique().tolist()
+                        # 후보 그룹별 현재 인원 딕셔너리 생성
+                        candidate_counts = {g: current_group_counts.get(g, 0) for g in candidate_groups}
+                        # 인원 오름차순으로 정렬
+                        sorted_groups = sorted(candidate_counts, key=candidate_counts.get)
+                        # 인원 오름차순에 따라 결시생 순환 배정
+                        target_group = sorted_groups[idx % len(sorted_groups)]
+                        # 배정 및 인원수 업데이트
+                        row['초기그룹'] = target_group
+                        assign_absent_rows.append(row)
+                        current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
+                    # 남학교 or 여학교 + 선택과목 없음
+                    elif st.session_state['sex_classification'] in ['남학교', '여학교'] and st.session_state['subject_based_classification'] == '아니오':
+                        condition = pd.Series([True] * group_assign_df.shape[0], index=group_assign_df.index) # 그룹 배정 인덱스와 일치화
+                        filtered_df = group_assign_df[condition]
+                        if filtered_df.empty:
+                            candidate_groups = list(current_group_counts.keys())
+                        else:
+                            candidate_groups = filtered_df['초기그룹'].unique().tolist()
+                        # 후보 그룹별 현재 인원 딕셔너리 생성
+                        candidate_counts = {g: current_group_counts.get(g, 0) for g in candidate_groups}
+                        # 인원 오름차순으로 정렬
+                        sorted_groups = sorted(candidate_counts, key=candidate_counts.get)
+                        # 인원 오름차순에 따라 결시생 순환 배정
+                        target_group = sorted_groups[idx % len(sorted_groups)]
+                        # 배정 및 인원수 업데이트
+                        row['초기그룹'] = target_group
+                        assign_absent_rows.append(row)
+                        current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
+                    else:
+                        st.error("결시생 그룹 배정에 필요한 설정이 올바르게 되어있는지 확인해주세요.")
+                absent_df = pd.DataFrame(assign_absent_rows)
+                st.session_state['absent_df'] = absent_df
+                st.subheader("결시생 그룹 배정 결과")
+                st.dataframe(absent_df, use_container_width=True)
+                # 기존 그룹 배정 데이터프레임과 결시생 병합
+                group_assign_df = st.session_state['group_assign_df']
+                group_assign_df = pd.concat([group_assign_df, absent_df], ignore_index=True)
+                st.session_state['group_assign_df'] = group_assign_df
+                group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
 
             #! 특수학생 처리 (나중에 고민하는 걸로)
             special_student_rows = []

@@ -1,3 +1,6 @@
+from turtle import pd
+
+
 def compute_ideal_discrete_freq(init_grouped_df, selected_discrete_variable):
     """
     이상적인(ideal) 이산형 변수별 그룹 빈도수를 계산하는 함수
@@ -256,7 +259,7 @@ def compute_group_diff_and_sign(ideal_freq, group_freq, selected_discrete_variab
                     actual_count = group_freq[g][var].get(key, 0)
                     diff = ideal_count - actual_count
                     diff_dict[key] = diff
-                    sign_dict[key] = np.sign(diff)
+                    sign_dict[key] = np.sign(diff) # 이상치보다 작으면 +1, 크면 -1, 같으면 0
 
                 # 변수별 결과를 group_diff_cost에 저장
                 group_diff_cost[g][f'{var}_diff'] = diff_dict
@@ -336,7 +339,10 @@ def compute_discrete_cost(group_diff_cost, s_row, t_row, selected_discrete_varia
         for var in selected_discrete_variable:
             source_cat = s_row[var]
             print(f"변수: {var}, 출발 그룹: {source_group}, 도착 그룹: {target_group}, 카테고리: {source_cat}")
-            sign_val = group_diff_cost[source_group][f'{var}_sign'][source_cat]
+            if pd.isna(source_cat):
+                print(f"출발 학생의 해당 변수 {var} 값이 NaN이므로 이동 불가 처리")
+                return -np.inf  # NaN 값인 경우 즉시 이동 불가 처리
+            sign_val = group_diff_cost[source_group][f'{var}_sign'][source_cat] #! s_row의 var가 nan인 경우가 존재할 수 있음
 
             if sign_val > 0:  # 부족 상태면 즉시 이동 금지
                 return -np.inf
