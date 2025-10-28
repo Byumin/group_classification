@@ -325,6 +325,7 @@ def compute_discrete_cost(group_diff_cost, s_row, t_row, selected_discrete_varia
     """
     import copy
     import numpy as np
+    import pandas as pd
     try:
         # deepcopy로 원본 안전하게 복사
         new_group_diff = copy.deepcopy(group_diff_cost)
@@ -338,7 +339,7 @@ def compute_discrete_cost(group_diff_cost, s_row, t_row, selected_discrete_varia
         move_allowed = False  # 기본값: 이동 불가
         for var in selected_discrete_variable:
             source_cat = s_row[var]
-            print(f"변수: {var}, 출발 그룹: {source_group}, 도착 그룹: {target_group}, 카테고리: {source_cat}")
+            #print(f"변수: {var}, 출발 그룹: {source_group}, 도착 그룹: {target_group}, 카테고리: {source_cat}")
             if pd.isna(source_cat):
                 print(f"출발 학생의 해당 변수 {var} 값이 NaN이므로 이동 불가 처리")
                 return -np.inf  # NaN 값인 경우 즉시 이동 불가 처리

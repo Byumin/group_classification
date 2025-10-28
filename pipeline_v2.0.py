@@ -487,7 +487,7 @@ with tabs[3]:
                     absent_df = st.session_state['absent_merged_df'] # 결시생 데이터프레임 분리
                     df = df[~df['merge_key'].isin(absent_df['merge_key'])]
                 else:
-                    pass
+                    st.session_state['absent_df'] = pd.DataFrame()
                 if st.session_state['special_student_handling'] == '예':
                     special_student_df = st.session_state['merged_df'][st.session_state['merged_df']['특수학생'] == 1] # 특수학생 데이터프레임 분리
                     st.session_state['special_student_df'] = special_student_df
@@ -520,7 +520,7 @@ with tabs[3]:
                     group_assign_df = cost_group_move(100, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
-                    group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
+                    group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False) #! 초기 그룹 배정 저장
                     # 그룹별로 결과 표시
                     for group in st.session_state['full_group_names']:
                         st.subheader(f"{group} 학생 목록")
@@ -555,7 +555,7 @@ with tabs[3]:
                     group_assign_df = cost_group_move(100, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
-                    group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 그룹 배정 저장
+                    group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False) #! 그룹 배정 저장
                     # 그룹별로 결과 표시
                     for group in st.session_state['full_group_names']:
                         st.subheader(f"{group} 학생 목록")
@@ -592,7 +592,7 @@ with tabs[3]:
                         group_assign_df = pd.concat([group_assign_df, gender_group_assign_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
-                    group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 그룹 배정 저장
+                    group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False) #! 그룹 배정 저장
                     # 그룹별로 결과 표시
                     for group in st.session_state['full_group_names']:
                         st.subheader(f"{group} 학생 목록")
@@ -630,7 +630,7 @@ with tabs[3]:
                         group_assign_df = pd.concat([group_assign_df, gender_subject_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
-                    group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
+                    group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False) #! 초기 그룹 배정 저장
                     # 그룹별로 결과 표시
                     for group in st.session_state['full_group_names']:
                         st.subheader(f"{group} 학생 목록")
@@ -655,7 +655,7 @@ with tabs[3]:
                     group_assign_df = cost_group_move(100, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
-                    group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
+                    group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False) #! 초기 그룹 배정 저장
                     # 그룹별로 결과 표시
                     for group in st.session_state['full_group_names']:
                         st.subheader(f"{group} 학생 목록")
@@ -687,7 +687,7 @@ with tabs[3]:
                         group_assign_df = pd.concat([group_assign_df, subject_group_assign_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
-                    group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
+                    group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False) #! 초기 그룹 배정 저장
                     # 그룹별로 결과 표시
                     for group in st.session_state['full_group_names']:
                         st.subheader(f"{group} 학생 목록")
@@ -828,7 +828,7 @@ with tabs[3]:
                 group_assign_df = st.session_state['group_assign_df']
                 group_assign_df = pd.concat([group_assign_df, absent_df], ignore_index=True)
                 st.session_state['group_assign_df'] = group_assign_df
-                group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
+                group_assign_df.to_excel('group_assign_df_결시생처리후.xlsx', index=False) #! 초기 그룹 배정 저장
 
             #! 특수학생 처리 (나중에 고민하는 걸로)
             special_student_rows = []
@@ -958,7 +958,7 @@ with tabs[3]:
                 group_assign_df = st.session_state['group_assign_df']
                 group_assign_df = pd.concat([group_assign_df, special_student_df], ignore_index=True)
                 st.session_state['group_assign_df'] = group_assign_df
-                group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
+                group_assign_df.to_excel('group_assign_df_특수학생처리후.xlsx', index=False) #! 초기 그룹 배정 저장
 
             #  출신 학교 기반 그룹 배정은 추후 개발
 
@@ -1026,7 +1026,7 @@ with tabs[4]:
                     st.success(f"{selected_main}의 관계가 저장되었습니다.")
 
         # 📊 관계 현황 보기
-        st.markdown("#### ③ 현재까지 저장된 관계 요약 및 관리")
+        st.markdown("#### 저장된 관계 요약 및 관리")
         if st.session_state['relationship_dict']:
             rel_df = pd.DataFrame.from_dict(st.session_state['relationship_dict'], orient='index').fillna(0)
             st.dataframe(rel_df, use_container_width=True)
@@ -1053,163 +1053,53 @@ with tabs[4]:
         st.divider()
         # 그룹 재배정 버튼
         if st.button("🔄 관계 기반 그룹 재배정 실행"):
-            
-            if 'group_assign_df' in st.session_state:
-                group_assign_df = st.session_state['group_assign_df']
-                relationship_dict = st.session_state['relationship_dict']
+
+            if 'group_assign_df' in st.session_state and 'relationship_dict' in st.session_state:
+                # 동명이인 처리
+                relationship_dict = st.session_state['relationship_dict'] # 관계 딕셔너리
+                cleaned_rel_dict = {} # 관계 중 0(무관) 제거하기 위해
+                for a, rels in relationship_dict.items():
+                    new_rels = {b: v for b, v in rels.items() if v != 0}
+                    if new_rels:
+                        cleaned_rel_dict[a] = new_rels
+                relationship_dict = cleaned_rel_dict
+                group_assign_df = st.session_state['group_assign_df'] # 그룹 배정 데이터프레임
+                # 동명이인 관계 자동 추가
+                dup_df = group_assign_df[group_assign_df['동명이인_ID'].notna()]
+                dup_groups = dup_df.groupby('동명이인_ID')['merge_key'].apply(list) # 동명이인 그룹 딕셔너리
+                for _, same_name_keys in dup_groups.items():
+                    for i in range(len(same_name_keys)):
+                        for j in range(i+1, len(same_name_keys)):
+                            a, b = same_name_keys[i], same_name_keys[j]
+                            relationship_dict.setdefault(a, {})[b] = -1
+                            relationship_dict.setdefault(b, {})[a] = -1
+                st.session_state['relationship_dict'] = relationship_dict
+                st.info("동명이인 관계가 자동으로 추가되었습니다.")
+
+                # 관계(relationship_dict) 텍스트 저장
+                with open('relationship_dict.txt', 'w', encoding='utf-8') as f:
+                    f.write(str(st.session_state['relationship_dict']))
+                # 그룹 재배정 로직 실행
                 selected_discrete_variable = st.session_state.get('selected_discrete_variable', [])
                 selected_discrete_variable = ['성별_명렬표' if var == '성별' else var for var in st.session_state['selected_discrete_variable']]
                 selected_sort_variable_dict = st.session_state.get('selected_sort_variable_dict', {})
-                from assign_relation_groups_optimal import find_relation_groups, relation_groups_to_dict, assign_relation_groups_optimal, merge_optimal_assignments
+                from assign_relation_groups_optimal import find_relation_groups_optimized, find_relation_groups_minimal, relation_groups_to_dict, assign_relation_groups_optimal, merge_optimal_assignments
                 from cost_group_move import cost_group_move
                 # 그룹 재배정 로직 구현
-                groups = find_relation_groups(relationship_dict)
+                #groups = find_relation_groups_optimized(relationship_dict, max_iter=10, verbose=True)
+                groups = find_relation_groups_minimal(relationship_dict, max_iter=10, target_n_groups=group_assign_df['초기그룹'].nunique(), verbose=True)
                 print('찾은 관계 그룹:', groups)
                 relationship_group_dict, relationship_group_df_dict = relation_groups_to_dict(groups, group_assign_df)
                 remaining_df, best_assignment, best_total_cost = assign_relation_groups_optimal(group_assign_df, relationship_group_dict, relationship_group_df_dict, selected_discrete_variable)
                 print(best_assignment)
                 final_df = merge_optimal_assignments(remaining_df, best_assignment, relationship_group_df_dict)
                 print(selected_discrete_variable, selected_sort_variable_dict)
-                final_group_assign_df = cost_group_move(100, 0.01, 100, 1, final_df, selected_discrete_variable, selected_sort_variable_dict)
+                final_group_assign_df = cost_group_move(50, 0.01, 100, 1, final_df, selected_discrete_variable, selected_sort_variable_dict)
                 st.success("그룹 재배정이 완료되었습니다.")
                 st.session_state['final_group_assign_df'] = final_group_assign_df
                 final_group_assign_df.to_excel('final_group_assign_df.xlsx', index=False) #! 최종 그룹 배정 저장
             else:
                 st.warning("먼저 그룹 배정(group_assign_df)을 생성해주세요.")
-
-        # 결시생 처리 (관계 고려한 재배정 후 처리)
-        final_group_assign_df = st.session_state.get('final_group_assign_df', None)
-        if final_group_assign_df is not None:
-            assign_absent_rows = []
-            current_group_counts = final_group_assign_df['초기그룹'].value_counts().to_dict()
-            if st.session_state['absent_student_handling'] in ['예', '아니오'] and not st.session_state['absent_merged_df'].empty: # 결시생 있고 골고루 배정 원할 때
-                st.info("결시생이 존재하여 그룹별로 균형있게 배정 중입니다...")
-                absent_df = st.session_state['absent_merged_df']
-                group_assign_df = st.session_state['group_assign_df']
-                selected_discrete_variable = st.session_state.get('selected_discrete_variable', [])
-                for idx, row in absent_df.iterrows():
-                    # 조건 설정 (성별, 선택과목)
-                    # 분반 + 선택과목 있음
-                    if st.session_state['sex_classification'] == '분반' and st.session_state['subject_based_classification'] == '예':
-                        condition = ((group_assign_df['성별_명렬표'] == row['성별_명렬표']) &(group_assign_df['선택과목'] == row['선택과목']))
-                        filtered_df = group_assign_df[condition]
-                        if filtered_df.empty:
-                            candidate_groups = list(current_group_counts.keys())
-                        else:
-                            candidate_groups = filtered_df['초기그룹'].unique().tolist()
-                        # 후보 그룹별 현재 인원 딕셔너리 생성
-                        candidate_counts = {g: current_group_counts.get(g, 0) for g in candidate_groups}
-                        # 인원 오름차순으로 정렬
-                        sorted_groups = sorted(candidate_counts, key=candidate_counts.get)
-                        # 인원 오름차순에 따라 결시생 순환 배정
-                        target_group = sorted_groups[idx % len(sorted_groups)]
-                        # 배정 및 인원수 업데이트
-                        row['초기그룹'] = target_group
-                        assign_absent_rows.append(row)
-                        current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
-                    # 분반 + 선택과목 없음
-                    elif st.session_state['sex_classification'] == '분반' and st.session_state['subject_based_classification'] == '아니오':
-                        condition = (group_assign_df['성별_명렬표'] == row['성별_명렬표'])
-                        filtered_df = group_assign_df[condition]
-                        if filtered_df.empty:
-                            candidate_groups = list(current_group_counts.keys())
-                        else:
-                            candidate_groups = filtered_df['초기그룹'].unique().tolist()
-                        # 후보 그룹별 현재 인원 딕셔너리 생성
-                        candidate_counts = {g: current_group_counts.get(g, 0) for g in candidate_groups}
-                        # 인원 오름차순으로 정렬
-                        sorted_groups = sorted(candidate_counts, key=candidate_counts.get)
-                        # 인원 오름차순에 따라 결시생 순환 배정
-                        target_group = sorted_groups[idx % len(sorted_groups)]
-                        # 배정 및 인원수 업데이트
-                        row['초기그룹'] = target_group
-                        assign_absent_rows.append(row)
-                        current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
-                    # 합반 + 선택과목 있음
-                    elif st.session_state['sex_classification'] == '합반' and st.session_state['subject_based_classification'] == '예':
-                        condition = ((group_assign_df['선택과목'] == row['선택과목']))
-                        filtered_df = group_assign_df[condition]
-                        if filtered_df.empty:
-                            candidate_groups = list(current_group_counts.keys())
-                        else:
-                            candidate_groups = filtered_df['초기그룹'].unique().tolist()
-                        # 후보 그룹별 현재 인원 딕셔너리 생성
-                        candidate_counts = {g: current_group_counts.get(g, 0) for g in candidate_groups}
-                        # 인원 오름차순으로 정렬
-                        sorted_groups = sorted(candidate_counts, key=candidate_counts.get)
-                        # 인원 오름차순에 따라 결시생 순환 배정
-                        target_group = sorted_groups[idx % len(sorted_groups)]
-                        # 배정 및 인원수 업데이트
-                        row['초기그룹'] = target_group
-                        assign_absent_rows.append(row)
-                        current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
-                    # 합반 + 선택과목 없음
-                    elif st.session_state['sex_classification'] == '합반' and st.session_state['subject_based_classification'] == '아니오':
-                        condition = pd.Series([True] * group_assign_df.shape[0], index=group_assign_df.index) # 그룹 배정 인덱스와 일치화
-                        filtered_df = group_assign_df[condition]
-                        if filtered_df.empty:
-                            candidate_groups = list(current_group_counts.keys())
-                        else:
-                            candidate_groups = filtered_df['초기그룹'].unique().tolist()
-                        # 후보 그룹별 현재 인원 딕셔너리 생성
-                        candidate_counts = {g: current_group_counts.get(g, 0) for g in candidate_groups}
-                        # 인원 오름차순으로 정렬
-                        sorted_groups = sorted(candidate_counts, key=candidate_counts.get)
-                        # 인원 오름차순에 따라 결시생 순환 배정
-                        target_group = sorted_groups[idx % len(sorted_groups)]
-                        # 배정 및 인원수 업데이트
-                        row['초기그룹'] = target_group
-                        assign_absent_rows.append(row)
-                        current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
-                    # 남학교 or 여학교 + 선택과목 있음
-                    elif st.session_state['sex_classification'] in ['남학교', '여학교'] and st.session_state['subject_based_classification'] == '예':
-                        condition = (group_assign_df['선택과목'] == row['선택과목'])
-                        filtered_df = group_assign_df[condition]
-                        if filtered_df.empty:
-                            candidate_groups = list(current_group_counts.keys())
-                        else:
-                            candidate_groups = filtered_df['초기그룹'].unique().tolist()
-                        # 후보 그룹별 현재 인원 딕셔너리 생성
-                        candidate_counts = {g: current_group_counts.get(g, 0) for g in candidate_groups}
-                        # 인원 오름차순으로 정렬
-                        sorted_groups = sorted(candidate_counts, key=candidate_counts.get)
-                        # 인원 오름차순에 따라 결시생 순환 배정
-                        target_group = sorted_groups[idx % len(sorted_groups)]
-                        # 배정 및 인원수 업데이트
-                        row['초기그룹'] = target_group
-                        assign_absent_rows.append(row)
-                        current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
-                    # 남학교 or 여학교 + 선택과목 없음
-                    elif st.session_state['sex_classification'] in ['남학교', '여학교'] and st.session_state['subject_based_classification'] == '아니오':
-                        condition = pd.Series([True] * group_assign_df.shape[0], index=group_assign_df.index) # 그룹 배정 인덱스와 일치화
-                        filtered_df = group_assign_df[condition]
-                        if filtered_df.empty:
-                            candidate_groups = list(current_group_counts.keys())
-                        else:
-                            candidate_groups = filtered_df['초기그룹'].unique().tolist()
-                        # 후보 그룹별 현재 인원 딕셔너리 생성
-                        candidate_counts = {g: current_group_counts.get(g, 0) for g in candidate_groups}
-                        # 인원 오름차순으로 정렬
-                        sorted_groups = sorted(candidate_counts, key=candidate_counts.get)
-                        # 인원 오름차순에 따라 결시생 순환 배정
-                        target_group = sorted_groups[idx % len(sorted_groups)]
-                        # 배정 및 인원수 업데이트
-                        row['초기그룹'] = target_group
-                        assign_absent_rows.append(row)
-                        current_group_counts[target_group] = current_group_counts.get(target_group, 0) + 1
-                    else:
-                        st.error("결시생 그룹 배정에 필요한 설정이 올바르게 되어있는지 확인해주세요.")
-                absent_df = pd.DataFrame(assign_absent_rows)
-                st.session_state['absent_df'] = absent_df
-                st.subheader("결시생 그룹 배정 결과")
-                st.dataframe(absent_df, use_container_width=True)
-                # 기존 그룹 배정 데이터프레임과 결시생 병합
-                group_assign_df = st.session_state['group_assign_df']
-                group_assign_df = pd.concat([group_assign_df, absent_df], ignore_index=True)
-                st.session_state['group_assign_df'] = group_assign_df
-                group_assign_df.to_excel('group_assign_df.xlsx', index=False) #! 초기 그룹 배정 저장
-            else:
-                pass
     else:
         st.warning("먼저 그룹 배정(group_assign_df)을 생성해주세요.")
 

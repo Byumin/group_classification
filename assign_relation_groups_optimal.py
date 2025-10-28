@@ -1,39 +1,232 @@
 # 관계 그룹 탐색 함수
-def find_relation_groups(relation_dict):
+def find_relation_groups_minimal(relation_dict, max_iter=10, target_n_groups=None, verbose=True):
+    """
+    +1 관계는 묶고, -1 관계는 분리하되,
+    병합 시 작은 그룹끼리 2개씩만 순차적으로 병합하며,
+    그룹 수가 target_n_groups 이하로 내려가면 중단한다.
+    """
     from collections import defaultdict, deque
+    import copy, random
 
-    # 1️⃣ 모든 학생 목록 추출 (key, value 모두 포함)
+    # 전체 학생 목록 수집
     all_students = set(relation_dict.keys())
-    for relations in relation_dict.values():
-        all_students.update(relations.keys())
+    for rels in relation_dict.values():
+        all_students.update(rels.keys())
 
-    # 2️⃣ 양방향 그래프 생성 (관계 == 1 인 경우만)
-    graph = defaultdict(set)
-    for student, relations in relation_dict.items():
-        for other, relation in relations.items():
-            if relation == 1:
-                graph[student].add(other)
-                graph[other].add(student)
+    # 그래프 구성
+    graph_pos = defaultdict(set)
+    graph_neg = defaultdict(set)
+    for s, rels in relation_dict.items():
+        for t, v in rels.items():
+            if v == 1:
+                graph_pos[s].add(t)
+                graph_pos[t].add(s)
+            elif v == -1:
+                graph_neg[s].add(t)
+                graph_neg[t].add(s)
 
-    # 3️⃣ 방문 관리 및 BFS 탐색
+    # Step 1️⃣ +1 관계 기반 연결
     visited = set()
-    groups = []
-
-    for student in all_students:
-        if student not in visited:
-            visited.add(student)
-            group = set([student])
-            queue = deque([student])
-
+    base_groups = []
+    for s in all_students:
+        if s not in visited:
+            queue = deque([s])
+            group = set([s])
+            visited.add(s)
             while queue:
-                current = queue.popleft()
-                for neighbor in graph[current]:
-                    if neighbor not in visited:
-                        visited.add(neighbor)
-                        group.add(neighbor)
-                        queue.append(neighbor)
+                cur = queue.popleft()
+                for nb in graph_pos[cur]:
+                    if nb not in visited:
+                        visited.add(nb)
+                        queue.append(nb)
+                        group.add(nb)
+            base_groups.append(group)
 
-            groups.append(group)
+    # Step 2️⃣ 그룹 내 -1 관계 분리
+    refined_groups = []
+    for group in base_groups:
+        subgroups = []
+        for student in group:
+            placed = False
+            for sg in subgroups:
+                if all((s2 not in graph_neg[student]) for s2 in sg):
+                    sg.add(student)
+                    placed = True
+                    break
+            if not placed:
+                subgroups.append(set([student]))
+        refined_groups.extend(subgroups)
+
+    # Step 3️⃣ 작은 그룹끼리 순차 병합
+    groups = copy.deepcopy(refined_groups)
+
+    def has_conflict(g1, g2):
+        """두 그룹 사이에 -1 관계가 있으면 True"""
+        for a in g1:
+            for b in g2:
+                if relation_dict.get(a, {}).get(b) == -1 or relation_dict.get(b, {}).get(a) == -1:
+                    return True
+        return False
+
+    for iteration in range(max_iter):
+        # 그룹을 크기 오름차순으로 정렬
+        groups.sort(key=len)
+
+        # 병합이 불가능하거나 그룹 수가 목표 이하이면 중단
+        if target_n_groups and len(groups) <= target_n_groups:
+            if verbose:
+                print(f"✅ Iter {iteration+1}: 목표 그룹 수({target_n_groups}) 이하로 도달하여 중단합니다.")
+            break
+        if len(groups) < 2:
+            if verbose:
+                print("✅ 병합 가능한 그룹이 1개 이하입니다. 중단합니다.")
+            break
+
+        merged = False
+        new_groups = []
+        used = set()
+
+        # 작은 그룹 2개만 병합
+        for i in range(len(groups)):
+            if i in used:
+                continue
+            g1 = groups[i]
+            # 다음으로 작은 그룹 찾아서 병합 시도
+            for j in range(i+1, len(groups)):
+                if j in used:
+                    continue
+                g2 = groups[j]
+                if not has_conflict(g1, g2):
+                    # 병합 수행
+                    merged_group = g1 | g2
+                    new_groups.append(merged_group)
+                    used.update([i, j])
+                    merged = True
+                    break
+            else:
+                # 병합 대상이 없으면 그대로 유지
+                if i not in used:
+                    new_groups.append(g1)
+
+            # 한 번 병합했으면 이번 iteration은 종료 (2개만 병합)
+            if merged:
+                break
+
+        # 병합 안 된 나머지 그룹 유지
+        for k in range(len(groups)):
+            if k not in used and groups[k] not in new_groups:
+                new_groups.append(groups[k])
+
+        groups = new_groups
+
+        if verbose:
+            print(f"🌀 Iter {iteration+1}: 그룹 수 = {len(groups)}")
+
+        if not merged:
+            if verbose:
+                print("✅ 더 이상 병합 가능한 그룹이 없어 중단합니다.")
+            break
+
+    return groups
+
+def find_relation_groups_optimized(relation_dict, max_iter=10, verbose=True):
+    """
+    +1 관계는 묶고, -1 관계는 분리하되,
+    -1 관계 위배 없이 병합 가능한 그룹은 여러 번 반복적으로 병합하여 최적화한다.
+    """
+    from collections import defaultdict, deque
+    import copy
+
+    # 전체 학생 목록 수집
+    all_students = set(relation_dict.keys())
+    for rels in relation_dict.values():
+        all_students.update(rels.keys())
+
+    # 그래프 구성
+    graph_pos = defaultdict(set)
+    graph_neg = defaultdict(set)
+    for s, rels in relation_dict.items():
+        for t, v in rels.items():
+            if v == 1:
+                graph_pos[s].add(t)
+                graph_pos[t].add(s)
+            elif v == -1:
+                graph_neg[s].add(t)
+                graph_neg[t].add(s)
+
+    # Step 1️⃣ +1 관계 기반 연결
+    visited = set()
+    base_groups = []
+    for s in all_students:
+        if s not in visited:
+            queue = deque([s])
+            group = set([s])
+            visited.add(s)
+            while queue:
+                cur = queue.popleft()
+                for nb in graph_pos[cur]:
+                    if nb not in visited:
+                        visited.add(nb)
+                        queue.append(nb)
+                        group.add(nb)
+            base_groups.append(group)
+
+    # Step 2️⃣ 그룹 내 -1 관계 분리
+    refined_groups = []
+    for group in base_groups:
+        subgroups = []
+        for student in group:
+            placed = False
+            for sg in subgroups:
+                if all((s2 not in graph_neg[student]) for s2 in sg):
+                    sg.add(student)
+                    placed = True
+                    break
+            if not placed:
+                subgroups.append(set([student]))
+        refined_groups.extend(subgroups)
+
+    # Step 3️⃣ 반복 병합 최적화
+    groups = copy.deepcopy(refined_groups)
+
+    def has_conflict(g1, g2):
+        """두 그룹 사이에 -1 관계가 있으면 True"""
+        for a in g1:
+            a_rel = relation_dict.get(a, {})  # 안전 접근
+            for b in g2:
+                b_rel = relation_dict.get(b, {})  # 안전 접근
+                if a_rel.get(b) == -1 or b_rel.get(a) == -1:
+                    return True
+        return False
+
+    for iteration in range(max_iter):
+        merged_any = False
+        used = set()
+        new_groups = []
+
+        for i, g1 in enumerate(groups):
+            if any(x in used for x in g1):
+                continue
+            merged = set(g1)
+            for j, g2 in enumerate(groups):
+                if i == j or any(x in used for x in g2):
+                    continue
+                if not has_conflict(merged, g2):  # 관계 위배 없으면 병합
+                    merged |= g2
+                    used |= g2
+                    merged_any = True
+            new_groups.append(merged)
+            used |= g1
+
+        groups = new_groups
+
+        if verbose:
+            print(f"🌀 Iter {iteration+1}: 그룹 수 = {len(groups)}")
+
+        if not merged_any:
+            if verbose:
+                print("✅ 더 이상 병합 가능한 그룹이 없어 중단합니다.")
+            break
 
     return groups
 
