@@ -180,7 +180,7 @@ def compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable)
                 for key, ideal_count in ideal_freq['population'][var].items():
                     # 해당 범주의 실제 빈도를 가져오되 없으면 0으로 처리
                     actual_count = group_freq[g][var].get(key, 0)
-                    diff = ideal_count - actual_count
+                    diff = np.sign(ideal_count - actual_count)*(ideal_count - actual_count)**2 # 양수 : 이상치보다 부족, 음수 : 이상치보다 과잉
                     diff_square = (ideal_count - actual_count)**2 #! 제곱하여 편차가 커질 수록 더 큰 페널티 부여
 
                     # 편차 누적
@@ -348,7 +348,7 @@ def compute_discrete_cost(group_diff_cost, s_row, t_row, selected_discrete_varia
             source_cat = s_row[var]
             #print(f"변수: {var}, 출발 그룹: {source_group}, 도착 그룹: {target_group}, 카테고리: {source_cat}")
             if pd.isna(source_cat):
-                print(f"출발 학생의 해당 변수 {var} 값이 NaN이므로 이동 불가 처리")
+                #print(f"출발 학생({s_row['merge_key']})의 해당 변수 {var} 값이 NaN이므로 이동 불가 처리")
                 return -np.inf  # NaN 값인 경우 즉시 이동 불가 처리
             sign_val = group_diff_cost[source_group][f'{var}_sign'][source_cat] #! s_row의 var가 nan인 경우가 존재할 수 있음
 
@@ -455,6 +455,8 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
             prev_mean_size = init_grouped_df.groupby('초기그룹').size().mean() # 이상적인 그룹 크기
             prev_size_cost = sum([abs(len(init_grouped_df[init_grouped_df['초기그룹'] == g]) - prev_mean_size) for g in init_grouped_df['초기그룹'].unique()]) # 그룹 크기 불균형도 -> 값이 클수록 불균형
             prev_total_cost = prev_diff_cost + 10 * prev_size_cost
+            # 이동 기록
+            move_history = []
 
             for iter_num in range(max_iter):
                 print(f"\n======= Iteration {iter_num+1} =======")
@@ -578,6 +580,8 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
             ideal_freq = compute_ideal_discrete_freq(init_grouped_df, selected_discrete_variable)
             print("이상적인 이산형 변수 빈도수:")
             print(ideal_freq)
+            # 이동 기록
+            move_history = []
 
             # 이전 총 비용 계산, 연속형, 이산형 모두 반영
             prev_group_mean = [init_grouped_df[init_grouped_df['초기그룹'] == g][selected_sort_variable].mean() for g in init_grouped_df['초기그룹'].unique()]
@@ -611,10 +615,12 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
 
                 # 이동 전 이상현 빈도 출력
                 print("##############################")
+                print("이전 그룹 이상적 빈도:")
+                print(ideal_freq)
                 print("이전 그룹 빈도 분포:")
                 print(group_freq)
                 print("그룹별 총 불균형도:")
-                print(group_total_cost_square)
+                print(group_total_cost)
                 
                 # 불균형이 가장 큰 그룹 탐색
                 source_group_idx = min(group_total_cost, key=group_total_cost.get) # 이상치보다 많은 그룹에서 이동을 해야함. 그렇기 때문에 해당 값이 음수(이상-실제)일수록 이동 우선순위가 높음
@@ -691,15 +697,21 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
                 best_cost = pair_costs[best_pair]
                 print("최고 효율 쌍:", best_pair)
                 print("비용:", best_cost)
-                # 실제 그룹 이동
                 idx_s, idx_t = best_pair
-                # 그룹 실제 이동하는거 확인
+                # 실제 이동 전 기록 저장
+                # move_key = (s_idx, init_grouped_df.loc[idx_s, '초기그룹'], t_idx, init_grouped_df.loc[idx_t, '초기그룹'])
+                # if move_key in move_history:
+                #     print("이미 이동한 쌍이라 중단합니다.")
+                #     break
+                # 실제 그룹 이동
                 print("++이동하는 정보++")
                 print(f"그룹 이동 완료: {init_grouped_df.loc[idx_s, '초기그룹']} -> {init_grouped_df.loc[idx_t, '초기그룹']}")
                 print("이동 학생 정보:")
                 print(init_grouped_df.loc[idx_s, selected_discrete_variable])
                 print("+++++++++++++++")
                 init_grouped_df.loc[idx_s, '초기그룹'] = init_grouped_df.loc[idx_t, '초기그룹']
+                # 이동 기록 업데이트
+                # move_history.append(move_key)
                 # 이동 후 비용 계산
                 new_group_mean = init_grouped_df.groupby('초기그룹')[selected_sort_variable].mean()
                 new_pop_mean = init_grouped_df[selected_sort_variable].mean()

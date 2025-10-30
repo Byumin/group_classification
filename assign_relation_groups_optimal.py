@@ -289,8 +289,8 @@ def assign_relation_groups_optimal(group_assign_df, relationship_group_dict, rel
             temp_df = pd.concat([temp_df, rel_copy], ignore_index=False)
 
             after_group_freq = compute_group_discrete_freq(temp_df, selected_discrete_variable)
-            after_group_total_cost = compute_group_total_cost(ideal_freq, after_group_freq, selected_discrete_variable)
-            total_cost = sum(abs(v) for v in after_group_total_cost.values())
+            _, after_group_total_cost_square = compute_group_total_cost(ideal_freq, after_group_freq, selected_discrete_variable)
+            total_cost = sum(abs(v) for v in after_group_total_cost_square.values())
             
             cost_matrix[i, j] = total_cost
         print(f"관계그룹 {rel_key} 완료.")

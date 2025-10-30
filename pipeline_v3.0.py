@@ -1090,7 +1090,7 @@ with tabs[4]:
                     assign_relation_groups_optimal,
                     merge_optimal_assignments
                 )
-                from cost_group_move import cost_group_move
+                from cost_group_move_v2 import cost_group_move
 
                 # --- 1️⃣ 케이스별 groupby 기준 설정
                 sex_cls = st.session_state['sex_classification']
@@ -1277,8 +1277,9 @@ with tabs[5]:
         st.info("연속형 변수가 없습니다.")
     else:
         selected_continuous = st.selectbox("연속형 변수 선택", continuous_vars)
+        df_filtered = df[df['결시생'] == 0][[group_col, selected_continuous]]  # 결시생 제외
         mean_df = (
-            df.groupby(group_col)[selected_continuous]
+            df_filtered.groupby(group_col)[selected_continuous]
               .mean()
               .reset_index()
               .rename(columns={selected_continuous: '평균'})
