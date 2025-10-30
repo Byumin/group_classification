@@ -119,6 +119,7 @@ def compute_group_discrete_freq(init_grouped_df, selected_discrete_variable):
     return group_freq
 
 def compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable):
+    import numpy as np
     """
     각 그룹의 총 불균형도(total cost)를 계산하는 함수
 
@@ -166,10 +167,12 @@ def compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable)
     - 즉, 그룹의 total cost가 클수록 이상적인 분포와의 차이가 큼.
     """
 
+    group_total_cost_square = {}
     group_total_cost = {}
     try:
         # ✅ 각 그룹별로 계산
         for g in group_freq.keys():
+            total_cost_square = 0
             total_cost = 0
 
             # 각 이산형 변수별로 편차 계산
@@ -177,17 +180,20 @@ def compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable)
                 for key, ideal_count in ideal_freq['population'][var].items():
                     # 해당 범주의 실제 빈도를 가져오되 없으면 0으로 처리
                     actual_count = group_freq[g][var].get(key, 0)
-                    diff = ideal_count - actual_count # 이걸 절대값으로 계산해야하나? 뭔지 모르겠네
+                    diff = ideal_count - actual_count
+                    diff_square = (ideal_count - actual_count)**2 #! 제곱하여 편차가 커질 수록 더 큰 페널티 부여
 
-                    # 절댓값으로 편차 누적
-                    total_cost += diff
+                    # 편차 누적
+                    total_cost_square += diff_square # 불균형도 계산
+                    total_cost += diff # 방향성을 포함한 계산
 
             # 그룹별 총 불균형도 저장
             group_total_cost[g] = total_cost
+            group_total_cost_square[g] = total_cost_square
     except Exception as e:
         print("Error during compute_group_total_cost execution:", str(e))
         raise e
-    return group_total_cost
+    return group_total_cost, group_total_cost_square
 
 def compute_group_diff_and_sign(ideal_freq, group_freq, selected_discrete_variable):
     """
@@ -277,7 +283,8 @@ def compute_continuous_cost(init_grouped_df, s_row, t_row, selected_sort_variabl
 
         source_group_df = init_grouped_df[init_grouped_df['초기그룹'] == s_row['초기그룹']]
         target_group_df = init_grouped_df[init_grouped_df['초기그룹'] == t_row['초기그룹']]
-
+        
+        # 이동 전 이상 평균으로 부터 거리 계산
         before_dist = (
             np.abs(source_group_df[selected_sort_variable].mean() - pop_mean) +
             np.abs(target_group_df[selected_sort_variable].mean() - pop_mean)
@@ -290,7 +297,7 @@ def compute_continuous_cost(init_grouped_df, s_row, t_row, selected_sort_variabl
         # 이동 후 그룹별 평균 계산
         group_mean_after = simulated_df.groupby('초기그룹')[selected_sort_variable].mean()
 
-        # 이동 후 거리 계산
+        # 이동 후 이상 평균으로 부터 거리 계산
         after_dist = ( # 값이 작을수록 개선
             np.abs(group_mean_after.loc[t_row['초기그룹']] - pop_mean) +
             np.abs(group_mean_after.loc[s_row['초기그룹']] - pop_mean)
@@ -386,7 +393,46 @@ def compute_discrete_cost(group_diff_cost, s_row, t_row, selected_discrete_varia
         raise e
     return discrete_cost_change
 
+def compute_size_cost(init_grouped_df, s_row, t_row):
+    """
+    이동 전후 그룹 크기 균형 개선 정도를 계산하는 함수
+
+    Parameters
+    ----------
+    init_grouped_df : pd.DataFrame
+        전체 학생 데이터프레임 (초기 그룹 정보 포함)
+    s_row, t_row : pd.Series
+        출발 그룹과 도착 그룹의 학생 행
+
+    Returns
+    -------
+    delta_balance : float
+        이동 후 크기 불균형이 줄어든 정도 (양수면 개선, 음수면 악화)
+    """
+    import numpy as np
+
+    # 그룹 크기 계산
+    group_sizes = init_grouped_df.groupby('초기그룹').size()
+    group_mean_size = group_sizes.mean()
+
+    source_group = s_row['초기그룹']
+    target_group = t_row['초기그룹']
+
+    # 이동 전 불균형도 (절대값 기준)
+    before = abs(group_sizes[source_group] - group_mean_size) + abs(group_sizes[target_group] - group_mean_size)
+
+    # 이동 후 예상 크기 (이동 시뮬레이션)
+    after_source_size = group_sizes[source_group] - 1
+    after_target_size = group_sizes[target_group] + 1
+
+    after = abs(after_source_size - group_mean_size) + abs(after_target_size - group_mean_size)
+
+    # 개선량 계산 (양수면 개선)
+    delta_balance = before - after
+    return delta_balance
+
 def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_df, selected_discrete_variable, selected_sort_variable_dict):
+    import numpy as np
     print("cost_group_move 인자 확인메롱")
     print(f"max_iter: {max_iter}, tolerance: {tolerance}, w_discrete: {w_discrete}, w_continuous: {w_continuous}")
     print(f"selected_discrete_variable: {selected_discrete_variable}, selected_sort_variable: {selected_sort_variable_dict}")
@@ -433,7 +479,7 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
                     group_mean_diff = abs(group_mean - pop_mean) # 절대값
                     group_n_diff[g] = len(group_df) - group_mean_size # 그룹의 크기를 방향성 있도록 반영
                     group_abs_mean_cost[g] = group_mean_diff # 그룹의 평균은 절대값으로 반영
-                    group_tanh[g] = np.tanh(group_mean_size - len(group_df)) # 이상적 그룹 빈도보다 크면 +, 작으면 -, 같으면 0
+                    group_tanh[g] = np.tanh(group_mean_size - len(group_df)) # 이상적 그룹 빈도보다 크면 -, 작으면 +, 같으면 0
                 # group_n_diff 높은 그룹 선택
                 print(group_n_diff)
                 source_group_idx = max(group_n_diff, key=group_n_diff.get) # 평균적인 그룹 크기보다 학생 수가 가장 많은 그룹 선택, 이상치와 같은 경우 0인 그룹도 선택됨
@@ -443,9 +489,19 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
                 print("타깃 그룹의 tanh 방향:", target_tanh)
                 match_group_tanh_idx = [g for g in group_tanh if np.sign(group_tanh[g]) == np.sign(target_tanh)] # 이동할 그룹과 반대 방향을 가지는 그룹들 <- 여기서 이동할 그룹은 제외됨
                 print("타깃 그룹 후보:", match_group_tanh_idx)
-                match_group_abs_cost_idx = {g: group_abs_mean_cost[g] for g in match_group_tanh_idx} # 반대 방향 그룹 중 평균 편차(절대값) 딕셔너리
-                print("타깃 그룹 후보의 평균 편차:", match_group_abs_cost_idx)
-                match_group_idx = sorted(match_group_abs_cost_idx, key=match_group_abs_cost_idx.get, reverse=True)[:3] # 반대 방향 그룹 중 평균 편차 큰 상위 3개 그룹 선택
+                # 만약 match_group_tanh_idx 가 비어있다면 그룹 크기가 작은 순으로 선택
+                if not match_group_tanh_idx:
+                    print("타깃 그룹 후보가 없어 그룹 크기가 작은 순으로 선택합니다.")
+                    group_n = {g: group_sizes[g] for g in groups if g != source_group_idx}
+                    match_group_tanh_idx = sorted(group_n, key=group_n.get)[:2] # 그룹 크기가 작은 상위 2개 그룹 선택
+                # 평균차 뿐만 아니라 크기 차도 반영하여 선택 가능하도록 복합 점수 로직 추가
+                match_group_score = {}
+                for g in match_group_tanh_idx:
+                    match_group_mean_diff = group_abs_mean_cost[g]
+                    match_group_n_diff = abs(group_sizes[g] - group_mean_size)
+                    match_group_score[g] = match_group_mean_diff + 10 * match_group_n_diff # 그룹 크기가 더 중요하도록 설정 + 스케일 차이
+                print("타깃 그룹 후보의 비용 점수:", match_group_score)
+                match_group_idx = sorted(match_group_score, key=match_group_score.get, reverse=True)[:3] # 반대 방향 그룹 중 평균 편차 큰 상위 3개 그룹 선택
                 print("매칭 그룹:", set(match_group_idx))
                 print("##############################")
                 source_group_df = init_grouped_df[init_grouped_df['초기그룹']==source_group_idx]
@@ -467,14 +523,15 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
                         elif len(source_group_df) == len(target_group_df):
                             print("출발 그룹과 도착 그룹의 학생 수가 동일하여 연속형 변수 비용만 계산")
                             cont_cost = compute_continuous_cost(init_grouped_df, s_row, t_row, selected_sort_variable) # 연속형 변수 비용 계산 (값이 클수록 개선)
-                            size_penalty = 0
+                            size_cost = 0
                         else:
                         # 연속형 변수 비용 계산
                             cont_cost = compute_continuous_cost(init_grouped_df, s_row, t_row, selected_sort_variable) # 연속형 변수 비용 계산 (값이 클수록 개선)
-                            size_penalty = abs(group_sizes[s_row['초기그룹']] - group_mean_size) + abs(group_sizes[t_row['초기그룹']] - group_mean_size) # 그룹 크기 패널티 계산 (불균형, 값이 클수록 개선)
+                            # size_penalty = abs(group_sizes[s_row['초기그룹']] - group_mean_size) + abs(group_sizes[t_row['초기그룹']] - group_mean_size) # 그룹 크기 패널티 계산 (불균형, 특이한 경우 불균형 해소가 불가할 수 있음)
+                            size_cost = compute_size_cost(init_grouped_df, s_row, t_row) # 그룹 크기 패널티 계산 (값이 클수록 개선)
                         # 총 비용 계산
-                        total_cost = w_continuous * cont_cost + 100 * size_penalty
-                        print(f"쌍 ({s_idx}, {t_idx}) 연속형 비용: {cont_cost}, 크기 패널티: {size_penalty}, 총 비용: {total_cost}")
+                        total_cost = w_continuous * cont_cost + 100 * size_cost
+                        print(f"쌍 ({s_idx}, {t_idx}) 연속형 비용: {cont_cost}, 크기 패널티: {size_cost}, 총 비용: {total_cost}")
                         pair_costs[(s_idx, t_idx)] = total_cost
                 # 최대 비용 쌍 선택
                 best_pair = max(pair_costs, key=lambda x: pair_costs[x])
@@ -533,11 +590,11 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
             group_freq = compute_group_discrete_freq(init_grouped_df, selected_discrete_variable) # 각 그룹별 이산형 실제 빈도
             print("이전 그룹별 이산형 변수 빈도수:")
             print(group_freq)
-            prev_disc_cost = compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable) # 각 그룹별 이산형 총 불균형도
-            prev_disc_cost = {k: abs(v) for k, v in prev_disc_cost.items()} # 절대값 변환
+            _, group_total_cost_square = compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable) # 각 그룹별 이산형 총 불균형도
+            #prev_disc_cost = {k: abs(v) for k, v in prev_disc_cost.items()} # 절대값 변환
             print("이전 그룹별 이산형 불균형도:")
-            print(prev_disc_cost)
-            prev_disc_total_cost = sum(prev_disc_cost.values())
+            print(group_total_cost_square)
+            prev_disc_total_cost = sum(group_total_cost_square.values())
             print(f"이전 이산형 총 불균형도: {prev_disc_total_cost}")
             print(f"이전 연속형 비용: {prev_diff_cost}, 이전 이산형 비용: {prev_disc_total_cost}")
             print(w_discrete)
@@ -548,7 +605,7 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
                 print(f"\n======= Iteration {iter_num+1} =======")
                 # 그룹별 총 불균형도 및 diff, sign 계산
                 group_freq = compute_group_discrete_freq(init_grouped_df, selected_discrete_variable) # 각 그룹별 이산형 실제 빈도
-                group_total_cost = compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable) # 각 그룹별 이산형 총 불균형도
+                group_total_cost, group_total_cost_square = compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable) # 각 그룹별 이산형 총 불균형도
                 group_diff_cost = compute_group_diff_and_sign(ideal_freq, group_freq, selected_discrete_variable) # 각 그룹별 이산형 diff, sign
                 groups = init_grouped_df['초기그룹'].unique()
 
@@ -557,23 +614,14 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
                 print("이전 그룹 빈도 분포:")
                 print(group_freq)
                 print("그룹별 총 불균형도:")
-                print(group_total_cost)
-                print("##############################")
+                print(group_total_cost_square)
                 
                 # 불균형이 가장 큰 그룹 탐색
-                source_group_idx = min(group_total_cost, key=group_total_cost.get)
+                source_group_idx = min(group_total_cost, key=group_total_cost.get) # 이상치보다 많은 그룹에서 이동을 해야함. 그렇기 때문에 해당 값이 음수(이상-실제)일수록 이동 우선순위가 높음
                 print("##############################")
                 print(f"최고 편차 그룹 : {source_group_idx}")
                 print("이산변수 차이 및 부호 값:")
                 print(group_diff_cost[source_group_idx])
-                print("##############################")
-                print("------- 후보 타깃 그룹 탐색 -------")
-                for g in groups:
-                    if g == source_group_idx:
-                        continue
-                    print(f"그룹 {g}의 이산변수 차이 및 부호 값:")
-                    print(group_diff_cost[g])
-                print("##############################")
 
                 # 타깃 그룹 후보 제한 추가
                 # source_group와 반대 방향을 지니고 있는 그룹들로 제한
@@ -583,28 +631,33 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
                     reversed_target[var] = {}
                     for key, value in group_diff_cost[source_group_idx][f'{var}_sign'].items():
                         reversed_target[var][key] = -value
-                print(reversed_target)
+                print(reversed_target) # 이렇게 제한하니까 이산형 변수가 늘어날수록 매칭 그룹이 없는 경우가 발생함.
                 # 이거와 일치하는 방향의 그룹
+                match_threshold = 0.6 # 일치하는 그룹이 없는 경우를 대비한 임계값
                 match_group_idx = []
                 for g in groups:
-                    all_match = True
+                    if g == source_group_idx:
+                        continue
+                    total_keys = 0
+                    match_count = 0
                     for var in selected_discrete_variable:
-                        for key, value in reversed_target[var].items():
-                            if group_diff_cost[g][f'{var}_sign'].get(key, 0) != value:
-                                all_match = False
-                                break
-                        if not all_match:
-                            break
-                    if all_match:
+                        for key, target_sign in reversed_target[var].items():
+                            total_keys += 1
+                            current_sign = group_diff_cost[g][f'{var}_sign'].get(key, 0)
+                            if current_sign == target_sign:
+                                match_count += 1
+                    if total_keys == 0:
+                        continue
+                    match_ratio = match_count / total_keys
+                    # 임계값 이상인 경우 매칭 그룹으로 간주
+                    if match_ratio >= match_threshold:
                         match_group_idx.append(g)
-                        print(f"Matched group: {g}")
-                        print("이산변수 차이 및 부호 값:")
-                        print(group_diff_cost[g])
+                print("매칭 그룹 후보:", match_group_idx)
                 if match_group_idx == []:
                     print("일치하는 매칭 그룹이 없습니다. 그룹 전체로 진행됩니다.")
                     # 모든 그룹을 대상으로 탐색할 경우 시간 비용이 너무 큼
                     # match_group_idx = [g for g in groups if g != source_group_idx]
-                    match_group_idx = sorted(group_total_cost, key=group_total_cost.get, reverse=True)[:3]
+                    match_group_idx = sorted(group_total_cost, key=group_total_cost.get, reverse=True)[:2] # group_total_cost(이상-실제)값이기 때문에 이상치보다 작은 그룹 중 편차 큰 상위 2개 그룹 선택
 
                 print("매칭 그룹:", set(match_group_idx))
                 print("##############################")
@@ -626,9 +679,9 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
                         if s_row['초기그룹'] == t_row['초기그룹']:
                             continue
                         # 이산형 변수 비용 계산
-                        disc_cost = compute_discrete_cost(group_diff_cost, s_row, t_row, selected_discrete_variable)
+                        disc_cost = compute_discrete_cost(group_diff_cost, s_row, t_row, selected_discrete_variable) # 이산형 변수 비용 계산 (값이 클수록 개선)
                         # 연속형 변수 비용 계산
-                        cont_cost = compute_continuous_cost(init_grouped_df, s_row, t_row, selected_sort_variable)
+                        cont_cost = compute_continuous_cost(init_grouped_df, s_row, t_row, selected_sort_variable) # 연속형 변수 비용 계산 (값이 클수록 개선)
                         # 총 비용 계산
                         total_cost = w_discrete * disc_cost + w_continuous * cont_cost
 
@@ -652,9 +705,9 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
                 new_pop_mean = init_grouped_df[selected_sort_variable].mean()
                 new_diff_cost = sum([abs(gm - new_pop_mean) for gm in new_group_mean]) # 그룹 별 평균과 전체 평균의 차이의 절대값 합
                 group_freq = compute_group_discrete_freq(init_grouped_df, selected_discrete_variable)
-                new_disc_cost = compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable) # 각 그룹별 이산형 총 불균형도
-                new_disc_cost = {k: abs(v) for k, v in new_disc_cost.items()} # 절대값 변환
-                new_disc_total_cost = sum(new_disc_cost.values())
+                _, new_disc_cost_square = compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable) # 각 그룹별 이산형 총 불균형도
+                #new_disc_cost = {k: abs(v) for k, v in new_disc_cost.items()} # 절대값 변환
+                new_disc_total_cost = sum(new_disc_cost_square.values())
                 new_total_cost = new_diff_cost + 10 * new_disc_total_cost
                 print(f"이전 총 비용: {prev_total_cost}, 새로운 총 비용: {new_total_cost}")
                 # 비용 개선폭 계산

@@ -1202,6 +1202,9 @@ with tabs[4]:
                         for b, v in rels.items():
                             relation_summary.append({"학생A": a, "학생B": b, "관계": "같은 반" if v==1 else "다른 반"})
                     relation_summary_df = pd.DataFrame(relation_summary)
+                    # relation_summary_df과 related_df의 그룹 배정 결과만 병합
+                    relation_summary_df['학생A_그룹'] = relation_summary_df['학생A'].map(final_group_assign_df.set_index('merge_key')['초기그룹'])
+                    relation_summary_df['학생B_그룹'] = relation_summary_df['학생B'].map(final_group_assign_df.set_index('merge_key')['초기그룹'])
                     with st.expander("🔍 관계 상세 보기"):
                         st.dataframe(relation_summary_df, use_container_width=True)
 
@@ -1233,9 +1236,25 @@ with tabs[5]:
     # ① 그룹별 이산형 변수 빈도 시각화
     # -------------------------------------------------------------
     st.markdown("### 🎯 그룹별 이산형 변수 분포")
+    # 그룹별 크기 시각화
+    group_size_df = (
+        df.groupby(group_col)['merge_key']
+        .count()
+        .reset_index(name='학생 수')
+        .sort_values('학생 수', ascending=False)
+    )
+    fig_size = px.bar(
+        group_size_df,
+        x=group_col,
+        y='학생 수',
+        color_discrete_sequence=["#4C78A8"],
+        title="📊 그룹별 학생 수 분포",
+        text='학생 수'
+    )
+    st.plotly_chart(fig_size, use_container_width=True)
 
     if not discrete_vars:
-        st.info("이산형 변수가 없습니다.")
+        st.info("선택한 이산형 변수가 없습니다.")
     else:
         selected_discrete = st.selectbox("이산형 변수 선택", discrete_vars)
         freq_df = (
@@ -1264,6 +1283,7 @@ with tabs[5]:
               .reset_index()
               .rename(columns={selected_continuous: '평균'})
         )
+        mean_df['평균'] = mean_df['평균'].round(2)
         fig_mean = px.bar(
             mean_df, x=group_col, y='평균', title=f"그룹별 {selected_continuous} 평균 비교",
             text='평균'
