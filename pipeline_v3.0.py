@@ -476,7 +476,7 @@ with tabs[3]:
         try:
             if all(k in st.session_state for k in ['merged_df', 'selected_algorithm', 'selected_sort_variable_dict', 'selected_discrete_variable', 'sex_classification', 'group_count', 'subject_based_classification', 'absent_student_handling', 'special_student_handling', 'school_based_classification', 'full_group_names']):
                 from init_group_assign import tuple_from_df, suitable_bin_value, init_group_assign
-                from cost_group_move import compute_ideal_discrete_freq, cost_group_move, compute_group_discrete_freq, compute_group_total_cost, compute_group_diff_and_sign, compute_continuous_cost, compute_discrete_cost
+                from cost_group_move_v2 import compute_ideal_discrete_freq, cost_group_move, compute_group_discrete_freq, compute_group_total_cost, compute_group_diff_and_sign, compute_continuous_cost, compute_discrete_cost
                 # 병합된 데이터프레임 불러오기
                 df = st.session_state['merged_df'] # 앞에서 결시생, 동명이인 처리까지 완료된 데이터프레임
                 # 사용자가 성별을 선택한 경우 병합 후에 성별_명렬표로 명시
@@ -517,7 +517,7 @@ with tabs[3]:
                     group_assign_df['초기그룹'] = group_assign
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
-                    group_assign_df = cost_group_move(100, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move(50, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
                     group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False) #! 초기 그룹 배정 저장
@@ -552,7 +552,7 @@ with tabs[3]:
                         group_assign_df = pd.concat([group_assign_df, subject_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
-                    group_assign_df = cost_group_move(100, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move(50, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
                     group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False) #! 그룹 배정 저장
@@ -588,7 +588,7 @@ with tabs[3]:
                             selected_discrete_variable.remove("성별_명렬표")
                         else:
                             pass
-                        gender_group_assign_df = cost_group_move(100, 0.5, 100, 1, gender_df, selected_discrete_variable, selected_sort_variable_dict)
+                        gender_group_assign_df = cost_group_move(50, 0.5, 100, 1, gender_df, selected_discrete_variable, selected_sort_variable_dict)
                         group_assign_df = pd.concat([group_assign_df, gender_group_assign_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
@@ -626,7 +626,7 @@ with tabs[3]:
                             selected_discrete_variable.remove("성별_명렬표")
                         else:
                             pass
-                        gender_subject_df = cost_group_move(100, 0.5, 100, 1, gender_subject_df, selected_discrete_variable, selected_sort_variable_dict)
+                        gender_subject_df = cost_group_move(50, 0.5, 100, 1, gender_subject_df, selected_discrete_variable, selected_sort_variable_dict)
                         group_assign_df = pd.concat([group_assign_df, gender_subject_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
@@ -652,7 +652,7 @@ with tabs[3]:
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
                     print('초기 배정 병합 후 이산형 변수 열 확인', )
-                    group_assign_df = cost_group_move(100, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move(50, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
                     group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False) #! 초기 그룹 배정 저장
@@ -683,7 +683,7 @@ with tabs[3]:
                         # group_assign과 subject_df 병합
                         subject_df['초기그룹'] = subject_group_assign
                         # cost 함수 기반으로 그룹 배정 최적화
-                        subject_group_assign_df = cost_group_move(100, 0.5, 100, 1, subject_df, selected_discrete_variable, selected_sort_variable_dict)
+                        subject_group_assign_df = cost_group_move(50, 0.5, 100, 1, subject_df, selected_discrete_variable, selected_sort_variable_dict)
                         group_assign_df = pd.concat([group_assign_df, subject_group_assign_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("그룹 분류가 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
@@ -700,8 +700,15 @@ with tabs[3]:
             else:
                 st.error("그룹 분류에 필요한 설정이 올바르게 되어있는지 확인해주세요.")
 
-            # 결시생 처리 (그룹별 골고루 배정)
+            # 결시생 처리
+            ## 결시생을 그룹별로 균일하게 배치하는데, 성별을 고려해서 골고루 배치해야함
+            ## 그러나 특정한 경우 결시생이 하나의 그룹에 몰릴 수 있음
+            ### 1.그룹별 성별 편차 산출 2.음... 애매하네 균등배정도 되어야하는데 관계 재배정할때 틀어질 확률이 높은데
+            from cost_group_move_v2 import compute_group_discrete_freq
             assign_absent_rows = []
+            sex_ideal_freq = compute_ideal_discrete_freq(df, '성별_명렬표')
+            current_group_sex_freq = compute_group_discrete_freq(group_assign_df, '성별_명렬표')
+            current_group_sex_diff = compute_group_diff_and_sign(sex_ideal_freq, current_group_sex_freq, '성별_명렬표')
             current_group_counts = group_assign_df['초기그룹'].value_counts().to_dict()
             if st.session_state['absent_student_handling'] in ['예', '아니오'] and not st.session_state['absent_merged_df'].empty: # 결시생 있고 골고루 배정 원할 때
                 st.info("결시생이 존재하여 그룹별로 균형있게 배정 중입니다...")
@@ -715,7 +722,7 @@ with tabs[3]:
                         condition = ((group_assign_df['성별_명렬표'] == row['성별_명렬표']) &(group_assign_df['선택과목'] == row['선택과목']))
                         filtered_df = group_assign_df[condition]
                         if filtered_df.empty:
-                            candidate_groups = list(current_group_counts.keys())
+                            st.error("결시생 배정 중 오류가 발생했습니다. 결시생 조건에 맞는 그룹이 없습니다.")
                         else:
                             candidate_groups = filtered_df['초기그룹'].unique().tolist()
                         # 후보 그룹별 현재 인원 딕셔너리 생성
@@ -774,10 +781,13 @@ with tabs[3]:
                             candidate_groups = filtered_df['초기그룹'].unique().tolist()
                         # 후보 그룹별 현재 인원 딕셔너리 생성
                         candidate_counts = {g: current_group_counts.get(g, 0) for g in candidate_groups}
+                        print('Candidate Counts:', candidate_counts)
                         # 인원 오름차순으로 정렬
                         sorted_groups = sorted(candidate_counts, key=candidate_counts.get)
+                        print('Sorted Groups:', sorted_groups)
                         # 인원 오름차순에 따라 결시생 순환 배정
                         target_group = sorted_groups[idx % len(sorted_groups)]
+                        print('Target Group:', target_group)
                         # 배정 및 인원수 업데이트
                         row['초기그룹'] = target_group
                         assign_absent_rows.append(row)
