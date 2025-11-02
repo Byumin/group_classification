@@ -706,9 +706,9 @@ with tabs[3]:
             ### 1.그룹별 성별 편차 산출 2.음... 애매하네 균등배정도 되어야하는데 관계 재배정할때 틀어질 확률이 높은데
             from cost_group_move_v2 import compute_group_discrete_freq
             assign_absent_rows = []
-            sex_ideal_freq = compute_ideal_discrete_freq(df, '성별_명렬표')
-            current_group_sex_freq = compute_group_discrete_freq(group_assign_df, '성별_명렬표')
-            current_group_sex_diff = compute_group_diff_and_sign(sex_ideal_freq, current_group_sex_freq, '성별_명렬표')
+            #sex_ideal_freq = compute_ideal_discrete_freq(df, '성별_명렬표')
+            #current_group_sex_freq = compute_group_discrete_freq(group_assign_df, '성별_명렬표')
+            #current_group_sex_diff = compute_group_diff_and_sign(sex_ideal_freq, current_group_sex_freq, '성별_명렬표')
             current_group_counts = group_assign_df['초기그룹'].value_counts().to_dict()
             if st.session_state['absent_student_handling'] in ['예', '아니오'] and not st.session_state['absent_merged_df'].empty: # 결시생 있고 골고루 배정 원할 때
                 st.info("결시생이 존재하여 그룹별로 균형있게 배정 중입니다...")
