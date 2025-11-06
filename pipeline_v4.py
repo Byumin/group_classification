@@ -948,17 +948,17 @@ with tabs[3]:
             # 균형 배정된 학생(특수학생, 전출학생, 운동부, 결시생 등) 그룹별 빈도 확인
             initial_sex_choice = st.session_state['sex_classification']
             initial_subject_choice = st.session_state['subject_based_classification']
-            if special_sex_choice == '분반' and special_subject_choice == '예':
+            if initial_sex_choice == '분반' and initial_subject_choice == '예':
                 groupby_cols = ['성별_명렬표', '선택과목']
-            elif special_sex_choice == '분반' and special_subject_choice == '아니오':
+            elif initial_sex_choice == '분반' and initial_subject_choice == '아니오':
                 groupby_cols = ['성별_명렬표']
-            elif special_sex_choice == '합반' and special_subject_choice == '예':
+            elif initial_sex_choice == '합반' and initial_subject_choice == '예':
                 groupby_cols = ['선택과목']
-            elif special_sex_choice == '합반' and special_subject_choice == '아니오':
+            elif initial_sex_choice == '합반' and initial_subject_choice == '아니오':
                 groupby_cols = [] # 전체 그룹 대상으로
-            elif special_sex_choice in ['남학교', '여학교'] and special_subject_choice == '예':
+            elif initial_sex_choice in ['남학교', '여학교'] and initial_subject_choice == '예':
                 groupby_cols = ['선택과목']
-            elif special_sex_choice in ['남학교', '여학교'] and special_subject_choice == '아니오':
+            elif initial_sex_choice in ['남학교', '여학교'] and initial_subject_choice == '아니오':
                 groupby_cols = [] # 전체 그룹 대상이지만 남학교/여학교로 성별은 이미 하나임
             else:
                 groupby_cols = []
@@ -1145,7 +1145,8 @@ with tabs[4]:
                             target_n_groups=sub_df['초기그룹'].nunique(),
                             verbose=False
                         )
-                        if len(groups) > sub_df['초기그룹'].nunique():
+                        ## 관계 그룹이 그룹 수보다 많은 경우 오류 처리
+                        if len(groups) > len(sub_df['초기그룹'].nunique()):
                             st.error(f"관계 그룹 수가 그룹 수보다 많아 재배정 불가합니다.")
                         relationship_group_dict, relationship_group_df_dict = relation_groups_to_dict(groups, sub_df)
                         remaining_df, best_assignment, best_total_cost = assign_relation_groups_optimal(
@@ -1184,12 +1185,12 @@ with tabs[4]:
                     )
                     final_results.append(final_df)
 
-                # --- 3️⃣ 결과 병합 및 저장
+                # 결과 병합 및 저장
                 final_group_assign_df = pd.concat(final_results, ignore_index=True)
                 st.session_state['final_group_assign_df'] = final_group_assign_df
                 final_group_assign_df.to_excel('final_group_assign_df.xlsx', index=False)
                 st.success("🎉 관계 기반 그룹 재배정이 완료되었습니다.")
-                # --- 4️⃣ 관계 설정이 걸린 학생들 결과 확인
+                # 관계 설정이 걸린 학생들 결과 확인
                 st.subheader("관계 설정이 적용된 학생들 결과 확인")
                 relationship_dict = st.session_state['relationship_dict']
                 # 관계 설정이 걸린 학생 목록 추출
@@ -1307,11 +1308,29 @@ with tabs[5]:
     # -------------------------------------------------------------
     st.markdown("### 🧩 학생 이동 시뮬레이션")
     st.write("특정 학생을 다른 그룹으로 이동시켜 평균 및 빈도 변화 시뮬레이션을 수행할 수 있습니다.")
-
-    group_list = sorted(df[group_col].unique().tolist())
+    final_sex_choice = st.session_state['sex_classification']
+    final_subject_choice = st.session_state['subject_based_classification']
     all_students = sorted(df['merge_key'].unique().tolist())
-
     selected_student = st.selectbox("이동할 학생 선택", all_students)
+    # 선택한 학생의 필터링된 그룹 리스트 생성
+    ## 케이스별 groupby 기준 설정
+    if final_sex_choice == '분반' and final_subject_choice == '예':
+        groupby_cols = ['성별_명렬표', '선택과목']
+    elif final_sex_choice == '분반' and final_subject_choice == '아니오':
+        groupby_cols = ['성별_명렬표']
+    elif final_sex_choice == '합반' and final_subject_choice == '예':
+        groupby_cols = ['선택과목']
+    elif final_sex_choice == '합반' and final_subject_choice == '아니오':
+        groupby_cols = [] # 전체 그룹 대상으로
+    elif final_sex_choice in ['남학교', '여학교'] and final_subject_choice == '예':
+        groupby_cols = ['선택과목']
+    elif final_sex_choice in ['남학교', '여학교'] and final_subject_choice == '아니오':
+        groupby_cols = [] # 전체 그룹 대상이지만 남학교/여학교로 성별은 이미 하나임
+    else:
+        groupby_cols = []
+    groupby_cols = [group_col] + groupby_cols if groupby_cols else [group_col] # 그룹 컬럼 우선 추가
+    df.groupby(groupby_cols)
+    candidate_group_list = df.groupby(groupby_cols)[]
     current_group = int(df.loc[df['merge_key'] == selected_student, group_col].values[0])
     st.write(f"현재 그룹: **{current_group}**")
 
@@ -1363,6 +1382,7 @@ with tabs[5]:
             st.session_state['final_group_assign_df'] = sim_df
             sim_df.to_excel('final_group_assign_df_수동이동적용.xlsx', index=False)
             st.success(f"학생 {selected_student}이(가) {current_group} → {target_group} 그룹으로 이동 적용되었습니다.")
+    # 특정 학생 
     # 결시생의 경우 연속형은 제외해서 계산, 이산형의 경우 포함
     # 특수학생의 경우 역시 연속형은 제외, 이산형은 포함
 
