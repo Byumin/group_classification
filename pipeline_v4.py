@@ -478,34 +478,42 @@ with tabs[3]:
                 st.session_state['selected_discrete_variable'] = selected_discrete_variable
                 # 결시생, 특수학생, 운동부, 전출학생, 출신학교 분리 처리
                 ## 분리 순서에 따라 우선 순위가 달라질 수 있음
-                if st.session_state['special_student_handling'] == '예' and '특수학생' in df.columns:
-                    special_student_df = df[df['특수학생'] == 1] # 특수학생 데이터프레임 분리
-                    st.session_state['special_student_df'] = special_student_df
-                    df = df[~df['merge_key'].isin(special_student_df['merge_key'])]
-                else:
-                    st.warning("명렬표에 특수학생 정보가 없어 생략됩니다.")
-                    st.session_state['special_student_df'] = pd.DataFrame()
-                if st.session_state['transfer_student_handling'] == '예' and '전출예정' in df.columns:
-                    transfer_student_df = df[df['전출예정'] == 1] # 전출예정학생 데이터프레임 분리
-                    st.session_state['transfer_student_df'] = transfer_student_df
-                    df = df[~df['merge_key'].isin(transfer_student_df['merge_key'])]
-                else:
-                    st.warning("명렬표에 전출예정학생 정보가 없어 생략됩니다.")
-                    st.session_state['transfer_student_df'] = pd.DataFrame()
-                if st.session_state['athlete_student_handling'] == '예' and '운동부' in df.columns:
-                    athlete_student_df = df[df['운동부'] == 1] # 운동부 학생 데이터프레임 분리
-                    st.session_state['athlete_student_df'] = athlete_student_df
-                    df = df[~df['merge_key'].isin(athlete_student_df['merge_key'])]
-                else:
-                    st.warning("명렬표에 운동부 학생 정보가 없어 생략됩니다.")
-                    st.session_state['athlete_student_df'] = pd.DataFrame()
-                if st.session_state['absent_student_handling'] == '예' and not st.session_state['absent_merged_df'].empty:
-                    absent_df = st.session_state['absent_merged_df'] # 결시생 데이터프레임 분리
-                    st.session_state['absent_df'] = absent_df
-                    df = df[~df['merge_key'].isin(absent_df['merge_key'])]
-                else:
-                    st.warning("결시생이 없는 것으로 확인되어 생략됩니다.")
-                    st.session_state['absent_df'] = pd.DataFrame()
+                ## 유지보수에 용이하도록 아래와 같이 리팩터링
+                split_df_rules = {
+                    'special_student_handling': {'flag_col' : '특수학생', 'save_session_key': 'special_student_df', 'external': 'false'},
+                    'transfer_student_handling': {'flag_col' : '전출예정', 'save_session_key': 'transfer_student_df', 'external': 'false'},
+                    'athlete_student_handling': {'flag_col' : '운동부', 'save_session_key': 'athlete_student_df', 'external': 'false'},
+                    'absent_student_handling': {'flag_col' : '결시생', 'save_session_key': 'absent_df', 'external': 'true'}
+                }
+                for split_rule, rule_info in split_df_rules.items():
+                    # 설정이 예가 아니면 생략
+                    if st.session_state.get(split_rule, '아니오') != '예':
+                        st.session_state[rule_info['save_session_key']] = pd.DataFrame()
+                        st.warning(f"명렬표에 {rule_info['flag_col']} 정보가 없어 생략됩니다.")
+                        continue
+                    # 외부 세션 참조 여부 확인
+                    if rule_info['external']:
+                        source_df = st.session_state.get(rule_info['save_session_key'], pd.DataFrame()).copy()
+                    else:
+                        if rule_info['flag_col'] not in df.columns:
+                            st.warning(f"명렬표에 {rule_info['flag_col']} 정보가 없어 생략됩니다.")
+                            st.session_state[rule_info['save_session_key']] = pd.DataFrame() # 빈 데이터프레임 저장
+                            continue
+                        source_df = df[df[rule_info['flag_col']] == 1].copy()
+                    # 중복 방지, 앞에서 분리된 학생 제외 처리
+                    for prev_rule in split_df_rules:
+                        if prev_rule == split_rule:
+                            break
+                        prev_df = st.session_state.get(split_df_rules[prev_rule]['save_session_key'], pd.DataFrame())
+                        if not prev_df.empty:
+                            source_df = source_df[~source_df['merge_key'].isin(prev_df['merge_key'])]
+                    # 세션에 저장
+                    st.session_state[rule_info['save_session_key']] = source_df
+                    # 원본 데이터프레임에서 분리된 학생 제외 처리
+                    df = df[~df['merge_key'].isin(source_df['merge_key'])]
+                    # 확인용으로 저장
+                    df.to_excel(f"{rule_info['flag_col']}_분리후_남은학생.xlsx", index=False)
+                #! 출신학교 기반 분리 처리(추후 개발)
                 if st.session_state['school_based_classification'] == '예':
                     #! 추후 개발
                     df = df
@@ -1146,7 +1154,7 @@ with tabs[4]:
                             verbose=False
                         )
                         ## 관계 그룹이 그룹 수보다 많은 경우 오류 처리
-                        if len(groups) > len(sub_df['초기그룹'].nunique()):
+                        if len(groups) > sub_df['초기그룹'].nunique():
                             st.error(f"관계 그룹 수가 그룹 수보다 많아 재배정 불가합니다.")
                         relationship_group_dict, relationship_group_df_dict = relation_groups_to_dict(groups, sub_df)
                         remaining_df, best_assignment, best_total_cost = assign_relation_groups_optimal(
@@ -1212,6 +1220,7 @@ with tabs[4]:
                         for b, v in rels.items():
                             relation_summary.append({"학생A": a, "학생B": b, "관계": "같은 반" if v==1 else "다른 반"})
                     relation_summary_df = pd.DataFrame(relation_summary)
+                    relation_summary_df.to_excel('relation_summary_df.xlsx', index=False)
                     # relation_summary_df과 related_df의 그룹 배정 결과만 병합
                     relation_summary_df['학생A_그룹'] = relation_summary_df['학생A'].map(final_group_assign_df.set_index('merge_key')['초기그룹'])
                     relation_summary_df['학생B_그룹'] = relation_summary_df['학생B'].map(final_group_assign_df.set_index('merge_key')['초기그룹'])
@@ -1328,16 +1337,21 @@ with tabs[5]:
         groupby_cols = [] # 전체 그룹 대상이지만 남학교/여학교로 성별은 이미 하나임
     else:
         groupby_cols = []
-    groupby_cols = [group_col] + groupby_cols if groupby_cols else [group_col] # 그룹 컬럼 우선 추가
-    df.groupby(groupby_cols)
-    candidate_group_list = df.groupby(groupby_cols)[]
+    selected_row = df[df['merge_key'] == selected_student].iloc[0]
+    if groupby_cols:
+        # 선택한 학생이 속한 그룹 키
+        group_keys = tuple(selected_row[col] for col in groupby_cols)
+        # 전체 그룹
+        all_group_df = df.groupby(groupby_cols)
+        # 같은 그룹 키를 가진 학생들만 필터링
+        candidate_groups_df = all_group_df.get_group(group_keys)
+        # 선택한 학생이 속한 그룹 제외
+        exception_candidate_groups = candidate_groups_df.loc[candidate_groups_df['초기그룹'] != selected_row['초기그룹'], '초기그룹'].unique().tolist()
+    else:
+        exception_candidate_groups = df.loc[df['초기그룹'] != selected_row['초기그룹'], '초기그룹'].unique().tolist()
     current_group = int(df.loc[df['merge_key'] == selected_student, group_col].values[0])
     st.write(f"현재 그룹: **{current_group}**")
-
-    target_group = st.selectbox(
-        "이동할 대상 그룹 선택",
-        [g for g in group_list if g != current_group]
-    )
+    target_group = st.selectbox("이동할 대상 그룹 선택", exception_candidate_groups)
 
     # 이동 시뮬레이션 버튼
     if st.button("🔁 이동 시뮬레이션 실행"):
