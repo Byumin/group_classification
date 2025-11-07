@@ -480,39 +480,53 @@ with tabs[3]:
                 ## 분리 순서에 따라 우선 순위가 달라질 수 있음
                 ## 유지보수에 용이하도록 아래와 같이 리팩터링
                 split_df_rules = {
-                    'special_student_handling': {'flag_col' : '특수학생', 'save_session_key': 'special_student_df', 'external': 'false'},
-                    'transfer_student_handling': {'flag_col' : '전출예정', 'save_session_key': 'transfer_student_df', 'external': 'false'},
-                    'athlete_student_handling': {'flag_col' : '운동부', 'save_session_key': 'athlete_student_df', 'external': 'false'},
-                    'absent_student_handling': {'flag_col' : '결시생', 'save_session_key': 'absent_df', 'external': 'true'}
+                    'special_student_handling': {'flag_col' : '특수학생', 'save_session_key': 'special_student_df', 'external': False},
+                    'transfer_student_handling': {'flag_col' : '전출예정', 'save_session_key': 'transfer_student_df', 'external': False},
+                    'athlete_student_handling': {'flag_col' : '운동부', 'save_session_key': 'athlete_student_df', 'external': False},
+                    'absent_student_handling': {'flag_col' : '결시생', 'save_session_key': 'absent_df', 'external': True}
                 }
-                for split_rule, rule_info in split_df_rules.items():
-                    # 설정이 예가 아니면 생략
-                    if st.session_state.get(split_rule, '아니오') != '예':
-                        st.session_state[rule_info['save_session_key']] = pd.DataFrame()
-                        st.warning(f"명렬표에 {rule_info['flag_col']} 정보가 없어 생략됩니다.")
-                        continue
-                    # 외부 세션 참조 여부 확인
-                    if rule_info['external']:
-                        source_df = st.session_state.get(rule_info['save_session_key'], pd.DataFrame()).copy()
-                    else:
-                        if rule_info['flag_col'] not in df.columns:
+                try:
+                    for split_rule, rule_info in split_df_rules.items():
+                        print(f"Processing split rule: {split_rule}")
+                        # 설정이 예가 아니면 생략
+                        if st.session_state.get(split_rule, '아니오') != '예':
+                            st.session_state[rule_info['save_session_key']] = pd.DataFrame()
                             st.warning(f"명렬표에 {rule_info['flag_col']} 정보가 없어 생략됩니다.")
-                            st.session_state[rule_info['save_session_key']] = pd.DataFrame() # 빈 데이터프레임 저장
                             continue
-                        source_df = df[df[rule_info['flag_col']] == 1].copy()
-                    # 중복 방지, 앞에서 분리된 학생 제외 처리
-                    for prev_rule in split_df_rules:
-                        if prev_rule == split_rule:
-                            break
-                        prev_df = st.session_state.get(split_df_rules[prev_rule]['save_session_key'], pd.DataFrame())
-                        if not prev_df.empty:
-                            source_df = source_df[~source_df['merge_key'].isin(prev_df['merge_key'])]
-                    # 세션에 저장
-                    st.session_state[rule_info['save_session_key']] = source_df
-                    # 원본 데이터프레임에서 분리된 학생 제외 처리
-                    df = df[~df['merge_key'].isin(source_df['merge_key'])]
-                    # 확인용으로 저장
-                    df.to_excel(f"{rule_info['flag_col']}_분리후_남은학생.xlsx", index=False)
+                        # 외부 세션 참조 여부 확인
+                        if rule_info['external']:
+                            print("  Using external session data for splitting.")
+                            ## 외부에서 분리된 데이터프레임 불러오기
+                            source_df = st.session_state.get(rule_info['save_session_key'], pd.DataFrame()).copy()
+                        else: ## 외부에 없는 경우 merged_df에서 분리
+                            if rule_info['flag_col'] not in df.columns: ## 분리할 컬럼이 없는 경우 생략
+                                st.warning(f"명렬표에 {rule_info['flag_col']} 정보가 없어 생략됩니다.")
+                                st.session_state[rule_info['save_session_key']] = pd.DataFrame()
+                                continue
+                            else: ## 분리할 컬럼이 있는 경우
+                                print(f"  Splitting based on column: {rule_info['flag_col']}")
+                                source_df = df[df[rule_info['flag_col']] == 1].copy() ## 분리한 기준 컬럼으로 '1'인 행 분리
+                                st.ssession_state[rule_info['save_session_key']] = source_df
+                        # 중복 방지, 앞에서 분리된 학생 제외 처리
+                        for prev_rule in split_df_rules:
+                            print(f"  Checking previous rule: {prev_rule}")
+                            if prev_rule == split_rule: ## 현재 규칙과 동일하면 이전 규칙 검토 루프 탈출
+                                print(f"    Skipping current rule as it is the same as previous rule.")
+                                break
+                            else:
+                                prev_df = st.session_state.get(split_df_rules[prev_rule]['save_session_key'], pd.DataFrame())
+                                if not prev_df.empty:
+                                    source_df = source_df[~source_df['merge_key'].isin(prev_df['merge_key'])]
+                                else:
+                                    pass
+                        # 세션에 저장
+                        st.session_state[rule_info['save_session_key']] = source_df
+                        # 원본 데이터프레임에서 분리된 학생 제외 처리
+                        df = df[~df['merge_key'].isin(source_df['merge_key'])]
+                        # 확인용으로 저장
+                        df.to_excel(f"{rule_info['flag_col']}_분리후_남은학생.xlsx", index=False)
+                except Exception as e:
+                    st.error(f"결시생, 특수학생, 운동부, 전출학생 분리 처리 중 오류가 발생했습니다: {e}")
                 #! 출신학교 기반 분리 처리(추후 개발)
                 if st.session_state['school_based_classification'] == '예':
                     #! 추후 개발
