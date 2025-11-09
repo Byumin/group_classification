@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np # xlsxwriter 설치 필요 (다른 환경에서)
+import traceback
 import io
 
 st.set_page_config(page_title="그룹 분류 파이프라인", layout="wide")
@@ -457,14 +458,14 @@ with tabs[3]:
     )
     st.session_state['school_based_classification'] = school_based_classification
 
-    if st.session_state.get('group_count', 0) > 0:
-        full_group_names = []
-        for i in range(st.session_state['group_count']):
-            group_name = st.text_input(f"집단 {i+1}의 이름을 입력하세요", value=f"{i+1} 반")
-            full_group_names.append(group_name)
-        st.session_state['full_group_names'] = full_group_names
-    else:
-        st.warning(f"집단 이름 설정 중 오류가 발생했습니다.")
+    # if st.session_state.get('group_count', 0) > 0:
+    #     full_group_names = []
+    #     for i in range(st.session_state['group_count']):
+    #         group_name = st.text_input(f"{i+1}번째 반 이름을 입력하세요", value=f"{i+1} 반")
+    #         full_group_names.append(group_name)
+    #     st.session_state['full_group_names'] = full_group_names
+    # else:
+    #     st.warning(f"집단 이름 설정 중 오류가 발생했습니다.")
     
     if st.button("그룹 분류 시작"):
         try:
@@ -483,7 +484,7 @@ with tabs[3]:
                     'special_student_handling': {'flag_col' : '특수학생', 'save_session_key': 'special_student_df', 'external': False},
                     'transfer_student_handling': {'flag_col' : '전출예정', 'save_session_key': 'transfer_student_df', 'external': False},
                     'athlete_student_handling': {'flag_col' : '운동부', 'save_session_key': 'athlete_student_df', 'external': False},
-                    'absent_student_handling': {'flag_col' : '결시생', 'save_session_key': 'absent_df', 'external': True}
+                    'absent_student_handling': {'flag_col' : '결시생', 'save_session_key': 'absent_merged_df', 'external': True}
                 }
                 try:
                     for split_rule, rule_info in split_df_rules.items():
@@ -506,7 +507,7 @@ with tabs[3]:
                             else: ## 분리할 컬럼이 있는 경우
                                 print(f"  Splitting based on column: {rule_info['flag_col']}")
                                 source_df = df[df[rule_info['flag_col']] == 1].copy() ## 분리한 기준 컬럼으로 '1'인 행 분리
-                                st.ssession_state[rule_info['save_session_key']] = source_df
+                                st.session_state[rule_info['save_session_key']] = source_df
                         # 중복 방지, 앞에서 분리된 학생 제외 처리
                         for prev_rule in split_df_rules:
                             print(f"  Checking previous rule: {prev_rule}")
@@ -523,10 +524,9 @@ with tabs[3]:
                         st.session_state[rule_info['save_session_key']] = source_df
                         # 원본 데이터프레임에서 분리된 학생 제외 처리
                         df = df[~df['merge_key'].isin(source_df['merge_key'])]
-                        # 확인용으로 저장
-                        df.to_excel(f"{rule_info['flag_col']}_분리후_남은학생.xlsx", index=False)
                 except Exception as e:
                     st.error(f"결시생, 특수학생, 운동부, 전출학생 분리 처리 중 오류가 발생했습니다: {e}")
+
                 #! 출신학교 기반 분리 처리(추후 개발)
                 if st.session_state['school_based_classification'] == '예':
                     #! 추후 개발
@@ -545,6 +545,7 @@ with tabs[3]:
                     sorted_idx, sorted_x, final_bin_value = suitable_bin_value(tuples, st.session_state['group_count'])
                     # 초기 그룹 배정
                     group_assign = init_group_assign(tuples, st.session_state['group_count'], final_bin_value)
+                    group_assign = [int(g_n)+1 for g_n in group_assign]
                     # group_assign 데이터 프레임과 병합
                     group_assign_df = df.copy(deep=True)
                     group_assign_df['초기그룹'] = group_assign
@@ -565,10 +566,11 @@ with tabs[3]:
                     start_group_number = 0 # 그룹 번호 조정을 위한 변수 -> 그룹명과 매칭하기 위해
                     for subject, subject_df in subject_group_dict.items():
                         subject_group_count = st.session_state['subject_group_counts'].get(subject, 0) # 과목별 그룹 수 가지고오기 (ex 한문 2개, 일본어 1개 등)
-                        st.info(f"선택과목 : {subject}", f"학생 수 : {subject_df.shape[0]}", f"할당된 그룹 수 : {subject_group_count}")
+                        st.info(f"선택과목 : {subject}, 학생 수 : {subject_df.shape[0]}, 할당된 그룹 수 : {subject_group_count}")
                         subject_tuples = tuple_from_df(subject_df, col_names) # 정렬할 변수 튜플화
                         sorted_idx, sorted_x, final_bin_value = suitable_bin_value(subject_tuples, subject_group_count) # 과목별 분리된 데이터에서 적절한 bin_value 탐색
                         group_assign = init_group_assign(subject_tuples, subject_group_count, final_bin_value) # 과목별 초기 그룹 배정
+                        group_assign = [int(g_n)+1 for g_n in group_assign]
                         # 그룹 번호 조정
                         group_assign = [g_n + start_group_number for g_n in group_assign]
                         start_group_number = start_group_number + len(np.unique(group_assign)) # 다음 과목 그룹 번호 조정을 위해
@@ -592,10 +594,11 @@ with tabs[3]:
                     start_group_number = 0
                     for gender, gender_df in gender_group_dict.items():
                         gender_group_count = st.session_state['male_class_count'] if gender == '1' else st.session_state['female_class_count'] # 성별에 따른 그룹 수 할당
-                        st.info(f"성별 : {gender}", f"학생 수 : {gender_df.shape[0]}", f"할당된 그룹 수 : {gender_group_count}")
+                        st.info(f"성별 : {gender}, 학생 수 : {gender_df.shape[0]}, 할당된 그룹 수 : {gender_group_count}")
                         gender_tuples = tuple_from_df(gender_df, col_names)
                         sorted_idx, sorted_x, final_bin_value = suitable_bin_value(gender_tuples, gender_group_count)
                         gender_group_assign = init_group_assign(gender_tuples, gender_group_count, final_bin_value)
+                        gender_group_assign = [int(g_n)+1 for g_n in gender_group_assign]
                         # 그룹 번호 조정
                         gender_group_assign = [g_n + start_group_number for g_n in gender_group_assign]
                         start_group_number = start_group_number + len(np.unique(gender_group_assign))
@@ -622,10 +625,11 @@ with tabs[3]:
                     start_group_number = 0
                     for (gender, subject), gender_subject_df in gender_group_dict.items(): # gender_subject_df : 특정 성별, 특정 과목만 있는 데이터프레임
                         gender_subject_group_count = st.session_state['gender_subject_group_counts'].get((f'{gender}_{subject}'), 0)
-                        st.info(f"성별: {gender}", f"선택과목 : {subject}", f"학생수: {gender_subject_df.shape[0]}", f"할당된 그룹 수 : {gender_subject_group_count}")
+                        st.info(f"성별: {gender}, 선택과목 : {subject}, 학생수: {gender_subject_df.shape[0]}, 할당된 그룹 수 : {gender_subject_group_count}")
                         gender_tuples = tuple_from_df(gender_subject_df, col_names)
                         sorted_idx, sorted_x, final_bin_value = suitable_bin_value(gender_tuples, gender_subject_group_count)
                         group_assign = init_group_assign(gender_tuples, gender_subject_group_count, final_bin_value)
+                        group_assign = [int(g_n)+1 for g_n in group_assign]
                         # 그룹 번호 조정
                         group_assign = [g_n + start_group_number for g_n in group_assign]
                         start_group_number = start_group_number + len(np.unique(group_assign))
@@ -648,6 +652,7 @@ with tabs[3]:
                     sorted_idx, sorted_x, final_bin_value = suitable_bin_value(tuples, st.session_state['group_count'])
                     # 초기 그룹 배정
                     group_assign = init_group_assign(tuples, st.session_state['group_count'], final_bin_value)
+                    group_assign = [int(g_n)+1 for g_n in group_assign]
                     st.session_state['group_assign'] = group_assign
                     # group_assign과 merged_df 병합
                     group_assign_df = df.copy(deep=True)
@@ -669,10 +674,11 @@ with tabs[3]:
                     start_group_number = 0
                     for subject, subject_df in subject_group_dict.items():
                         subject_group_count = st.session_state['subject_group_counts'].get(subject, 0) # 과목별 그룹 수 가지고오기
-                        st.info(f"선택과목: {subject} 학생 수: {subject_df.shape[0]}", f"할당된 그룹 수: {subject_group_count}")
+                        st.info(f"선택과목: {subject}, 학생 수: {subject_df.shape[0]}, 할당된 그룹 수: {subject_group_count}")
                         subject_tuples = tuple_from_df(subject_df, col_names)
                         sorted_idx, sorted_x, final_bin_value = suitable_bin_value(subject_tuples, subject_group_count)
                         subject_group_assign = init_group_assign(subject_tuples, subject_group_count, final_bin_value)
+                        subject_group_assign = [int(g_n)+1 for g_n in subject_group_assign]
                         # 그룹 번호 조정
                         subject_group_assign = [g_n + start_group_number for g_n in subject_group_assign]
                         start_group_number = start_group_number + len(np.unique(subject_group_assign))
@@ -753,8 +759,21 @@ with tabs[3]:
                         st.session_state['group_assign_df'] = group_assign_df
                         st.success("특수학생 균등 배정이 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
                         group_assign_df.to_excel('group_assign_df_특수학생배정완료.xlsx', index=False) #! 특수학생 배정 저장
+                    elif groupby_cols == []: # 전체 그룹 대상으로 균등 배정
+                        group_counts = group_assign_df['초기그룹'].value_counts().to_dict() # groupby된 데이터프레임에서 그룹별 인원수 파악
+                        g_idx = 0
+                        sorted_group_no = sorted(group_counts, key=group_counts.get) # 인원수 적은 그룹부터 정렬 후 키값만 리스트로 반환
+                        for idx, row in special_student_df.iterrows():
+                            # 인원 오름차순에 따라 결시생 순환 배정
+                            special_student_df.loc[idx, '초기그룹'] = sorted_group_no[g_idx]
+                            special_student_df.loc[idx, '그룹고정'] = True
+                            g_idx = (g_idx + 1) % len(sorted_group_no) # 다음 그룹 인덱스로 순환
+                        # 그룹 배정된 결시생과 기존 그룹 데이터프레임 병합
+                        group_assign_df = pd.concat([group_assign_df, special_student_df], axis=0)
+                        st.session_state['group_assign_df'] = group_assign_df
                     else:
                         st.error("특수학생 균등 배정 중 오류가 발생했습니다. 그룹화 기준이 올바른지 확인해주세요.")
+                        traceback.print_exc()
                 except Exception as e:
                     st.error(f"특수학생 균등 배정 중 오류가 발생했습니다: {e}")
             else :
@@ -822,6 +841,18 @@ with tabs[3]:
                         st.session_state['group_assign_df'] = group_assign_df
                         st.success("전출학생 균등 배정이 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
                         group_assign_df.to_excel('group_assign_df_전출학생배정완료.xlsx', index=False) #! 전출학생 배정 저장
+                    elif groupby_cols == []: # 전체 그룹 대상으로 균등 배정
+                        group_counts = group_assign_df['초기그룹'].value_counts().to_dict() # groupby된 데이터프레임에서 그룹별 인원수 파악
+                        g_idx = 0
+                        sorted_group_no = sorted(group_counts, key=group_counts.get) # 인원수 적은 그룹부터 정렬 후 키값만 리스트로 반환
+                        for idx, row in transfer_student_df.iterrows():
+                            # 인원 오름차순에 따라 결시생 순환 배정
+                            transfer_student_df.loc[idx, '초기그룹'] = sorted_group_no[g_idx]
+                            transfer_student_df.loc[idx, '그룹고정'] = True
+                            g_idx = (g_idx + 1) % len(sorted_group_no) # 다음 그룹 인덱스로 순환
+                        # 그룹 배정된 결시생과 기존 그룹 데이터프레임 병합
+                        group_assign_df = pd.concat([group_assign_df, transfer_student_df], axis=0)
+                        st.session_state['group_assign_df'] = group_assign_df
                     else:
                         st.error("전출학생 균등 배정 중 오류가 발생했습니다. 그룹화 기준이 올바른지 확인해주세요.")
                 except Exception as e:
@@ -891,6 +922,18 @@ with tabs[3]:
                         st.session_state['group_assign_df'] = group_assign_df
                         st.success("운동부 균등 배정이 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
                         group_assign_df.to_excel('group_assign_df_운동부배정완료.xlsx', index=False) #! 운동부 배정 저장
+                    elif groupby_cols == []: # 전체 그룹 대상으로 균등 배정
+                        group_counts = group_assign_df['초기그룹'].value_counts().to_dict() # groupby된 데이터프레임에서 그룹별 인원수 파악
+                        g_idx = 0
+                        sorted_group_no = sorted(group_counts, key=group_counts.get) # 인원수 적은 그룹부터 정렬 후 키값만 리스트로 반환
+                        for idx, row in athlete_student_df.iterrows():
+                            # 인원 오름차순에 따라 결시생 순환 배정
+                            athlete_student_df.loc[idx, '초기그룹'] = sorted_group_no[g_idx]
+                            athlete_student_df.loc[idx, '그룹고정'] = True
+                            g_idx = (g_idx + 1) % len(sorted_group_no) # 다음 그룹 인덱스로 순환
+                        # 그룹 배정된 결시생과 기존 그룹 데이터프레임 병합
+                        group_assign_df = pd.concat([group_assign_df, athlete_student_df], axis=0)
+                        st.session_state['group_assign_df'] = group_assign_df
                     else:
                         st.error("운동부 균등 배정 중 오류가 발생했습니다. 그룹화 기준이 올바른지 확인해주세요.")
                 except Exception as e:
@@ -946,11 +989,13 @@ with tabs[3]:
                             # group_df에서 그룹 번호별 현재 인원수 파악
                             # 돌아가면서 결시생 배정 & 결시생은 해당 그룹 고정 옵션 추가
                             sub_group_counts = sub_group_df['초기그룹'].value_counts().to_dict() # groupby된 데이터프레임에서 그룹별 인원수 파악
+                            print(f"{sub_group_keys}: {sub_group_counts}")
                             g_idx = 0
                             sorted_sub_group_no = sorted(sub_group_counts, key=sub_group_counts.get) # 인원수 적은 그룹부터 정렬 후 키값만 리스트로 반환
                             for idx, row in filtered_absent_df.iterrows():
                                 # 인원 오름차순에 따라 결시생 순환 배정
                                 filtered_absent_df.loc[idx, '초기그룹'] = sorted_sub_group_no[g_idx]
+                                print(f"결시생 {row['merge_key']} -> 그룹 {sorted_sub_group_no[g_idx]}")
                                 filtered_absent_df.loc[idx, '그룹고정'] = True
                                 g_idx = (g_idx + 1) % len(sorted_sub_group_no) # 다음 그룹 인덱스로 순환
                             # 그룹 배정된 결시생과 해당 그룹 데이터프레임 병합
@@ -961,8 +1006,21 @@ with tabs[3]:
                         st.session_state['group_assign_df'] = group_assign_df
                         st.success("결시생 균등 배정이 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
                         group_assign_df.to_excel('group_assign_df_결시생배정완료.xlsx', index=False) #! 결시생 배정 저장
+                    elif groupby_cols == []: # 전체 그룹 대상으로 균등 배정
+                        group_counts = group_assign_df['초기그룹'].value_counts().to_dict() # groupby된 데이터프레임에서 그룹별 인원수 파악
+                        g_idx = 0
+                        sorted_group_no = sorted(group_counts, key=group_counts.get) # 인원수 적은 그룹부터 정렬 후 키값만 리스트로 반환
+                        for idx, row in absent_df.iterrows():
+                            # 인원 오름차순에 따라 결시생 순환 배정
+                            absent_df.loc[idx, '초기그룹'] = sorted_group_no[g_idx]
+                            absent_df.loc[idx, '그룹고정'] = True
+                            g_idx = (g_idx + 1) % len(sorted_group_no) # 다음 그룹 인덱스로 순환
+                        # 그룹 배정된 결시생과 기존 그룹 데이터프레임 병합
+                        group_assign_df = pd.concat([group_assign_df, absent_df], axis=0)
+                        st.session_state['group_assign_df'] = group_assign_df
                     else:
                         st.error("결시생 균등 배정 중 오류가 발생했습니다. 그룹화 기준이 올바른지 확인해주세요.")
+                        traceback.print_exc()
                 except Exception as e:
                     st.error(f"결시생 균등 배정 중 오류가 발생했습니다: {e}")
             else:
@@ -988,9 +1046,11 @@ with tabs[3]:
             candidate_cols = ['특수학생', '전출예정', '운동부', '결시생']
             existing_cols = [col for col in candidate_cols if col in group_assign_df.columns]
             freq_df = (group_assign_df.groupby(groupby_cols)[existing_cols].sum().astype(int))
-            st.markdown("#### 그룹별 균형 배정된 학생 현황")
+            st.markdown("##### 그룹별 배정된 특이분류학생(특수학생, 전출예정, 운동부, 결시생 등) 현황")
             st.dataframe(freq_df, use_container_width=True)
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             st.error(f"그룹 분류 중 오류가 발생했습니다: {e}")
 
 
@@ -1103,7 +1163,7 @@ with tabs[4]:
                             relationship_dict.setdefault(a, {})[b] = -1
                             relationship_dict.setdefault(b, {})[a] = -1
                 st.session_state['relationship_dict'] = relationship_dict
-                st.info("동명이인 관계가 자동으로 추가되었습니다.")
+                st.info("동명이인 관계가 다른반으로 추가되었습니다.")
 
                 # 관계(relationship_dict) 텍스트 저장
                 with open('relationship_dict.txt', 'w', encoding='utf-8') as f:
@@ -1167,9 +1227,10 @@ with tabs[4]:
                             target_n_groups=sub_df['초기그룹'].nunique(),
                             verbose=False
                         )
-                        ## 관계 그룹이 그룹 수보다 많은 경우 오류 처리
+                        ##! 관계 그룹이 그룹 수보다 많은 경우 오류 처리
                         if len(groups) > sub_df['초기그룹'].nunique():
-                            st.error(f"관계 그룹 수가 그룹 수보다 많아 재배정 불가합니다.")
+                            st.error(f"{group_key}에서 관계 그룹 수가 그룹 수보다 많아 재배정 불가합니다.")
+                            st.stop()
                         relationship_group_dict, relationship_group_df_dict = relation_groups_to_dict(groups, sub_df)
                         remaining_df, best_assignment, best_total_cost = assign_relation_groups_optimal(
                             sub_df, relationship_group_dict, relationship_group_df_dict, selected_discrete_variable
