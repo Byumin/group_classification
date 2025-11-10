@@ -48,7 +48,7 @@ else:
 st.title("🔧 그룹 분류 파이프라인")
 
 # 본문 탭 구성
-tabs = st.tabs(["🔍 명렬표 & 검사결과 비교", "🧪 변수 생성", "⚙️ 분류 알고리즘", "🧠 그룹 분류", "🧑‍🤝‍🧑 학생 관계 재배정", "📊 분류 후 분포 확인"])
+tabs = st.tabs(["🔍 명렬표 & 검사결과 비교", "🧪 변수 생성", "⚙️ 분류 알고리즘", "🧠 그룹 분류", "🧑‍🤝‍🧑 학생 관계 재배정", "📊 분류 후 분포 확인", "🔁  이동 및 교환", "📤 배정 결과 내보내기"])
 
 # 학생 명렬표와 검사 결과 데이터프레임 병합 비교 검토 필요
 # 병합했을 때 서로 겹치는 프레임과
@@ -469,7 +469,7 @@ with tabs[3]:
     
     if st.button("그룹 분류 시작"):
         try:
-            if all(k in st.session_state for k in ['merged_df', 'selected_algorithm', 'selected_sort_variable_dict', 'selected_discrete_variable', 'sex_classification', 'group_count', 'subject_based_classification', 'absent_student_handling', 'special_student_handling', 'school_based_classification', 'full_group_names']):
+            if all(k in st.session_state for k in ['merged_df', 'selected_algorithm', 'selected_sort_variable_dict', 'selected_discrete_variable', 'sex_classification', 'group_count', 'subject_based_classification', 'absent_student_handling', 'special_student_handling', 'school_based_classification']):
                 from init_group_assign import tuple_from_df, suitable_bin_value, init_group_assign
                 from cost_group_move_v2 import compute_ideal_discrete_freq, cost_group_move, compute_group_discrete_freq, compute_group_total_cost, compute_group_diff_and_sign, compute_continuous_cost, compute_discrete_cost
                 # 병합된 데이터프레임 불러오기
@@ -528,11 +528,11 @@ with tabs[3]:
                     st.error(f"결시생, 특수학생, 운동부, 전출학생 분리 처리 중 오류가 발생했습니다: {e}")
 
                 #! 출신학교 기반 분리 처리(추후 개발)
-                if st.session_state['school_based_classification'] == '예':
-                    #! 추후 개발
-                    df = df
-                else:
-                    st.session_state['school_based_df'] = pd.DataFrame()
+                # if st.session_state['school_based_classification'] == '예':
+                #     #! 추후 개발
+                #     df = df
+                # else:
+                #     st.session_state['school_based_df'] = pd.DataFrame()
                 # 기존 선택한 정렬할 연속형 변수 불러오기
                 selected_sort_variable_dict = st.session_state['selected_sort_variable_dict']
                 col_names = list(selected_sort_variable_dict.keys())
@@ -698,6 +698,7 @@ with tabs[3]:
             # 특수학생 처리
             ## 특수학생 그룹별로 균일하게 배치
             ## 특수학생이 결시할 경우 결시생이 아닌 특수학생 취급
+            group_assign_df = st.session_state['group_assign_df']
             if st.session_state['special_student_handling'] == '예' and '특수학생' in group_assign_df.columns:
                 try:
                     # 케이스별 groupby로 기준 설정
@@ -1053,7 +1054,6 @@ with tabs[3]:
             traceback.print_exc()
             st.error(f"그룹 분류 중 오류가 발생했습니다: {e}")
 
-
 # [4] 학생 관계 배정-------------------------------------------------
 with tabs[4]:
     st.subheader("학생 관계 재배정")
@@ -1308,6 +1308,7 @@ with tabs[4]:
         st.warning("먼저 그룹 배정(group_assign_df)을 생성해주세요.")
 
 # [5] 분포 시각화
+## 해당 소스의 대부분은 gpt 활용하여 작성됨
 with tabs[5]:
     import plotly.express as px
     import plotly.graph_objects as go
@@ -1324,7 +1325,6 @@ with tabs[5]:
     discrete_vars = st.session_state.get('selected_discrete_variable', [])
     discrete_vars = ['성별_명렬표' if var == '성별' else var for var in discrete_vars]
     continuous_vars = list(st.session_state.get('selected_sort_variable_dict', {}).keys())
-    group_col = '초기그룹'
 
     # -------------------------------------------------------------
     # ① 그룹별 이산형 변수 빈도 시각화
@@ -1332,14 +1332,14 @@ with tabs[5]:
     st.markdown("### 🎯 그룹별 이산형 변수 분포")
     # 그룹별 크기 시각화
     group_size_df = (
-        df.groupby(group_col)['merge_key']
+        df.groupby('초기그룹')['merge_key']
         .count()
         .reset_index(name='학생 수')
         .sort_values('학생 수', ascending=False)
     )
     fig_size = px.bar(
         group_size_df,
-        x=group_col,
+        x='초기그룹',
         y='학생 수',
         color_discrete_sequence=["#4C78A8"],
         title="📊 그룹별 학생 수 분포",
@@ -1352,12 +1352,12 @@ with tabs[5]:
     else:
         selected_discrete = st.selectbox("이산형 변수 선택", discrete_vars)
         freq_df = (
-            df.groupby([group_col, selected_discrete])
+            df.groupby(['초기그룹', selected_discrete])
               .size()
               .reset_index(name='빈도')
         )
         fig_cat = px.bar(
-            freq_df, x=group_col, y='빈도', color=selected_discrete,
+            freq_df, x='초기그룹', y='빈도', color=selected_discrete,
             barmode='stack', title=f"그룹별 {selected_discrete} 분포"
         )
         st.plotly_chart(fig_cat, use_container_width=True)
@@ -1371,29 +1371,31 @@ with tabs[5]:
         st.info("연속형 변수가 없습니다.")
     else:
         selected_continuous = st.selectbox("연속형 변수 선택", continuous_vars)
-        df_filtered = df[df['결시생'] == 0][[group_col, selected_continuous]]  # 결시생 제외
+        df_filtered = df[df['결시생'] == 0][['초기그룹', selected_continuous]]  # 결시생 제외
         mean_df = (
-            df_filtered.groupby(group_col)[selected_continuous]
+            df_filtered.groupby('초기그룹')[selected_continuous]
               .mean()
               .reset_index()
               .rename(columns={selected_continuous: '평균'})
         )
         mean_df['평균'] = mean_df['평균'].round(2)
         fig_mean = px.bar(
-            mean_df, x=group_col, y='평균', title=f"그룹별 {selected_continuous} 평균 비교",
+            mean_df, x='초기그룹', y='평균', title=f"그룹별 {selected_continuous} 평균 비교",
             text='평균'
         )
         st.plotly_chart(fig_mean, use_container_width=True)
 
-    st.divider()
-
-    # -------------------------------------------------------------
-    # ③ 수동 이동 시뮬레이션 구간
-    # -------------------------------------------------------------
-    st.markdown("### 🧩 학생 이동 시뮬레이션")
+# [6] 특정 교환 및 이동
+## 해당 소스의 대부분은 gpt 활용하여 작성됨
+with tabs[6]:
+    import plotly.express as px
+    import plotly.graph_objects as go
+    # 이동 및 교환 시뮬레이션
+    st.markdown("#### 학생 이동 시뮬레이션")
     st.write("특정 학생을 다른 그룹으로 이동시켜 평균 및 빈도 변화 시뮬레이션을 수행할 수 있습니다.")
     final_sex_choice = st.session_state['sex_classification']
     final_subject_choice = st.session_state['subject_based_classification']
+    df = st.session_state['final_group_assign_df']
     all_students = sorted(df['merge_key'].unique().tolist())
     selected_student = st.selectbox("이동할 학생 선택", all_students)
     # 선택한 학생의 필터링된 그룹 리스트 생성
@@ -1422,60 +1424,269 @@ with tabs[5]:
         candidate_groups_df = all_group_df.get_group(group_keys)
         # 선택한 학생이 속한 그룹 제외
         exception_candidate_groups = candidate_groups_df.loc[candidate_groups_df['초기그룹'] != selected_row['초기그룹'], '초기그룹'].unique().tolist()
+        exception_candidate_groups = [int(g_n) for g_n in exception_candidate_groups]
     else:
         exception_candidate_groups = df.loc[df['초기그룹'] != selected_row['초기그룹'], '초기그룹'].unique().tolist()
-    current_group = int(df.loc[df['merge_key'] == selected_student, group_col].values[0])
+        exception_candidate_groups = [int(g_n) for g_n in exception_candidate_groups]
+    current_group = int(df.loc[df['merge_key'] == selected_student, '초기그룹'].values[0])
     st.write(f"현재 그룹: **{current_group}**")
     target_group = st.selectbox("이동할 대상 그룹 선택", exception_candidate_groups)
 
     # 이동 시뮬레이션 버튼
-    if st.button("🔁 이동 시뮬레이션 실행"):
+    if st.button("이동 시뮬레이션 실행"):
+        st.info("선택한 학생을 다른 그룹으로 이동할 수 있습니다.")
         sim_df = df.copy(deep=True)
-        sim_df.loc[sim_df['merge_key'] == selected_student, group_col] = target_group
-
+        sim_df.loc[sim_df['merge_key'] == selected_student, '초기그룹'] = target_group
         # 이동 전후 평균 비교
-        before_mean = df.groupby(group_col)[selected_continuous].mean().reset_index().rename(columns={selected_continuous: '이동 전'})
-        after_mean = sim_df.groupby(group_col)[selected_continuous].mean().reset_index().rename(columns={selected_continuous: '이동 후'})
-        compare_mean = pd.merge(before_mean, after_mean, on=group_col, how='outer')
-
-        st.markdown("#### 📊 이동 전후 평균 비교")
+        before_mean = df.groupby('초기그룹')[selected_continuous].mean().reset_index().rename(columns={selected_continuous: '이동 전'})
+        after_mean = sim_df.groupby('초기그룹')[selected_continuous].mean().reset_index().rename(columns={selected_continuous: '이동 후'})
+        compare_mean = pd.merge(before_mean, after_mean, on='초기그룹', how='outer')
+        st.markdown("#### 이동 전후 평균 비교")
         fig_compare = go.Figure()
-        fig_compare.add_trace(go.Bar(x=compare_mean[group_col], y=compare_mean['이동 전'], name='이동 전'))
-        fig_compare.add_trace(go.Bar(x=compare_mean[group_col], y=compare_mean['이동 후'], name='이동 후'))
+        fig_compare.add_trace(go.Bar(x=compare_mean['초기그룹'], y=compare_mean['이동 전'], name='이동 전'))
+        fig_compare.add_trace(go.Bar(x=compare_mean['초기그룹'], y=compare_mean['이동 후'], name='이동 후'))
         fig_compare.update_layout(barmode='group', title=f"이동 전후 {selected_continuous} 평균 변화")
         st.plotly_chart(fig_compare, use_container_width=True)
-
         # 이동 전후 이산형 변수 빈도 비교
+        st.markdown("#### 이동 전후 이산형 분포 비교")
+        highlight_groups = [current_group, target_group]  # 강조할 그룹
         if discrete_vars:
-            selected_discrete_for_sim = st.selectbox("빈도 비교용 이산형 변수 선택", discrete_vars)
-            before_freq = (
-                df.groupby([group_col, selected_discrete_for_sim])
-                  .size().reset_index(name='이동 전')
+            st.markdown("#### 🎯 이동 전후 이산형 변수별 변화")
+            for selected_discrete_for_sim in discrete_vars:
+                before_freq = (
+                    df.groupby(['초기그룹', selected_discrete_for_sim])
+                    .size().reset_index(name='이동 전')
+                )
+                after_freq = (
+                    sim_df.groupby(['초기그룹', selected_discrete_for_sim])
+                    .size().reset_index(name='이동 후')
+                )
+                freq_compare = pd.merge(before_freq, after_freq, on=['초기그룹', selected_discrete_for_sim], how='outer').fillna(0)
+
+                # (a) 절대 빈도 비교
+                freq_melted = freq_compare.melt(
+                    id_vars=['초기그룹', selected_discrete_for_sim],
+                    value_vars=['이동 전', '이동 후'],
+                    var_name='상태', value_name='빈도'
+                )
+
+                fig_stacked = px.bar(
+                    freq_melted,
+                    x='초기그룹',
+                    y='빈도',
+                    color=selected_discrete_for_sim,
+                    facet_col='상태',
+                    barmode='stack',
+                    text='빈도',
+                    title=f"📊 {selected_discrete_for_sim} - 이동 전후 누적빈도 비교",
+                    color_discrete_sequence=['#4C78A8', '#F58518', '#E45756', '#72B7B2', '#54A24B']
+                )
+                # 🔥 강조 처리 (이동 출발 / 대상 그룹)
+                for trace in fig_stacked.data:
+                    opacities = [1.0 if x in highlight_groups else 0.3 for x in trace.x]
+                    trace.marker.opacity = opacities
+
+                fig_stacked.update_traces(texttemplate='%{text}', textposition='inside')
+                fig_stacked.update_layout(
+                    yaxis_title="빈도수",
+                    xaxis_title="그룹",
+                    legend_title=selected_discrete_for_sim,
+                    uniformtext_minsize=8,
+                    uniformtext_mode='hide',
+                    margin=dict(t=50, b=40, l=40, r=40),
+                    annotations=[
+                        dict(
+                            x=current_group,
+                            y=0,
+                            text="⬆ 이동 출발",
+                            showarrow=False,
+                            yshift=10,
+                            font=dict(color="red", size=12)
+                        ),
+                        dict(
+                            x=target_group,
+                            y=0,
+                            text="⬆ 이동 대상",
+                            showarrow=False,
+                            yshift=10,
+                            font=dict(color="red", size=12)
+                        )
+                    ]
+                )
+
+                st.plotly_chart(fig_stacked, use_container_width=True)
+
+        # ③ 적용 및 취소 기능
+        st.markdown("---")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("✅ 변경 적용"):
+                st.session_state['final_group_assign_df'] = sim_df
+                sim_df.to_excel('final_group_assign_df_수동이동적용.xlsx', index=False)
+                st.success(f"학생 {selected_student}이(가) {current_group} → {target_group} 그룹으로 이동이 적용되었습니다.")
+
+        with col2:
+            if st.button("↩️ 변경 취소"):
+                st.session_state['final_group_assign_df'] = df
+
+    st.divider()
+    st.markdown("#### 학생 교환 시뮬레이션")
+    st.write("선택한 학생과 다른 그룹의 유사한 학생을 교환하여 평균 및 분포 변화를 비교합니다.")
+    # 유사도 판단용 변수
+    selected_discrete_for_swap = st.multiselect("교환 유사도 판단용 이산형 변수 선택", discrete_vars)
+    selected_continuous_for_swap = st.selectbox("교환 유사도 판단용 연속형 변수 선택", continuous_vars)
+    if st.button("교환 시뮬레이션 실행"):
+        # 선택한 그룹에서 유사한 학생 탐색
+        target_df = df[df['초기그룹'] == target_group].copy()
+        
+        ## 선택한 학생의 이산형 정보와 동일한 학생 필터링
+        filter_df = pd.DataFrame([selected_row[selected_discrete_for_swap].to_dict()])
+        filtered_df = target_df.merge(filter_df, on=selected_discrete_for_swap, how='inner')
+        
+        if filtered_df.empty:
+            st.warning("교환할 유사한 학생이 없습니다.")
+        else:
+            # 연속형 변수 기준으로 가장 가까운 학생 탐색
+            selected_value = selected_row[selected_continuous_for_swap]
+            filtered_df['차이'] = (filtered_df[selected_continuous_for_swap] - selected_value).abs()
+            swap_candidate = filtered_df.nsmallest(1, '차이').iloc[0]
+            
+            st.markdown("#### 👥 교환 대상 학생 정보")
+            st.dataframe(selected_row.to_frame().T, use_container_width=True)
+            st.dataframe(swap_candidate.to_frame().T, use_container_width=True)
+            st.info(f"유사한 학생 탐색 완료: **{swap_candidate['merge_key']}**, "
+                    f"이산형 = {swap_candidate[selected_discrete_for_swap].to_dict()}, "
+                    f"연속형 = {selected_continuous_for_swap}")
+            
+            # 교환 수행
+            sim_df = df.copy(deep=True)
+            sim_df.loc[sim_df['merge_key'] == selected_student, '초기그룹'] = swap_candidate['초기그룹']
+            sim_df.loc[sim_df['merge_key'] == swap_candidate['merge_key'], '초기그룹'] = current_group
+
+            # (1) 교환 전후 연속형 평균 비교
+            before_mean = (
+                df.groupby('초기그룹')[selected_continuous_for_swap]
+                .mean().reset_index().rename(columns={selected_continuous_for_swap: '교환 전'})
             )
-            after_freq = (
-                sim_df.groupby([group_col, selected_discrete_for_sim])
-                  .size().reset_index(name='이동 후')
+            after_mean = (
+                sim_df.groupby('초기그룹')[selected_continuous_for_swap]
+                .mean().reset_index().rename(columns={selected_continuous_for_swap: '교환 후'})
             )
-            freq_compare = pd.merge(before_freq, after_freq, on=[group_col, selected_discrete_for_sim], how='outer').fillna(0)
-            st.markdown("#### 🎯 이동 전후 이산형 분포 비교")
-            fig_freq = px.bar(
-                freq_compare, x=group_col, y=['이동 전', '이동 후'],
-                color_discrete_sequence=['#4C78A8', '#E45756'],
+            compare_mean = pd.merge(before_mean, after_mean, on='초기그룹', how='outer')
+            
+            st.markdown("#### 📊 교환 전후 평균 비교")
+            fig_compare = go.Figure()
+            fig_compare.add_trace(go.Bar(x=compare_mean['초기그룹'], y=compare_mean['교환 전'], name='교환 전'))
+            fig_compare.add_trace(go.Bar(x=compare_mean['초기그룹'], y=compare_mean['교환 후'], name='교환 후'))
+            fig_compare.update_layout(
                 barmode='group',
-                title=f"이동 전후 {selected_discrete_for_sim} 분포 변화"
+                title=f"교환 전후 {selected_continuous_for_swap} 평균 변화",
+                yaxis_title="평균값"
             )
-            st.plotly_chart(fig_freq, use_container_width=True)
+            st.plotly_chart(fig_compare, use_container_width=True)
 
-        # “적용하기” 버튼
-        if st.button("✅ 변경 적용"):
-            st.session_state['final_group_assign_df'] = sim_df
-            sim_df.to_excel('final_group_assign_df_수동이동적용.xlsx', index=False)
-            st.success(f"학생 {selected_student}이(가) {current_group} → {target_group} 그룹으로 이동 적용되었습니다.")
-    # 특정 학생 
-    # 결시생의 경우 연속형은 제외해서 계산, 이산형의 경우 포함
-    # 특수학생의 경우 역시 연속형은 제외, 이산형은 포함
+            # (2) 교환 전후 이산형 변수 누적빈도 비교
+            st.markdown("#### 🎯 교환 전후 이산형 변수별 누적빈도 변화")
+            highlight_groups = [current_group, target_group]
 
+            for selected_discrete_for_sim in discrete_vars:
+                before_freq = (
+                    df.groupby(['초기그룹', selected_discrete_for_sim])
+                    .size().reset_index(name='교환 전')
+                )
+                after_freq = (
+                    sim_df.groupby(['초기그룹', selected_discrete_for_sim])
+                    .size().reset_index(name='교환 후')
+                )
+                freq_compare = pd.merge(
+                    before_freq, after_freq,
+                    on=['초기그룹', selected_discrete_for_sim],
+                    how='outer'
+                ).fillna(0)
 
+                # long 형식으로 변환
+                freq_melted = freq_compare.melt(
+                    id_vars=['초기그룹', selected_discrete_for_sim],
+                    value_vars=['교환 전', '교환 후'],
+                    var_name='상태',
+                    value_name='빈도'
+                )
+
+                # 누적 막대그래프 (facet으로 전/후 분리)
+                fig_stacked = px.bar(
+                    freq_melted,
+                    x='초기그룹',
+                    y='빈도',
+                    color=selected_discrete_for_sim,
+                    facet_col='상태',
+                    barmode='stack',
+                    text='빈도',
+                    title=f"{selected_discrete_for_sim} - 교환 전후 누적빈도 비교",
+                    color_discrete_sequence=['#4C78A8', '#F58518', '#E45756', '#72B7B2', '#54A24B']
+                )
+                # 강조 처리
+                for trace in fig_stacked.data:
+                    opacities = [1.0 if x in highlight_groups else 0.3 for x in trace.x]
+                    trace.marker.opacity = opacities 
+                fig_stacked.update_traces(texttemplate='%{text}', textposition='inside')
+                fig_stacked.update_layout(
+                    yaxis_title="빈도수",
+                    xaxis_title="그룹",
+                    legend_title=selected_discrete_for_sim,
+                    margin=dict(t=50, b=40, l=40, r=40),
+                    annotations=[
+                        dict(x=current_group, y=0, text="⬆ 교환 출발", showarrow=False,
+                            yshift=10, font=dict(color="red", size=12)),
+                        dict(x=target_group, y=0, text="⬆ 교환 대상", showarrow=False,
+                            yshift=10, font=dict(color="red", size=12))
+                    ]
+                )
+                st.plotly_chart(fig_stacked, use_container_width=True)
+
+            # (3) 적용 버튼
+            st.markdown("---")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ 교환 변경 적용"):
+                    st.session_state['final_group_assign_df'] = sim_df
+                    sim_df.to_excel('final_group_assign_df_수동교환적용.xlsx', index=False)
+                    st.success(f"학생 {selected_student} ↔ {swap_candidate['merge_key']} 교환이 적용되었습니다.")
+
+            with col2:
+                if st.button("↩️ 교환 변경 취소"):
+                    st.session_state['final_group_assign_df'] = df
+
+# [7] 배정 결과 내보내기
+## 해당 소스의 대부분은 gpt 활용하여 작성됨
+with tabs[7]:
+    st.subheader("최종 배정 결과 내보내기")
+    st.write("최종 그룹 배정 결과를 엑셀 파일로 내보낼 수 있습니다.")
+
+    if 'final_group_assign_df' not in st.session_state:
+        st.warning("먼저 그룹 배정을 완료해주세요.")
+        st.stop()
+    
+    final_df = st.session_state['final_group_assign_df']
+    # 그룹 번호순으로 나열
+    ## 그룹 내 이름 가나다순 번호 부여
+    ## 그룹 내 성별로 분류하여 번호 부여
+    ## 전출학생 마지막 번호 부여
+    ## 운동부 마지막 번호 부여
+
+    # 엑셀 파일로 저장
+    output_filename = '최종_그룹_배정_결과.xlsx'
+    final_df.to_excel(output_filename, index=False)
+
+    # 다운로드 버튼
+    with open(output_filename, 'rb') as f:
+        st.download_button(
+            label="⬇️ 최종 그룹 배정 결과 다운로드",
+            data=f,
+            file_name=output_filename,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+    st.success("최종 그룹 배정 결과가 엑셀 파일로 저장되었습니다.")
 
 
 # streamlit run c:/Users/USER/group_classification/pipeline_v4.py
