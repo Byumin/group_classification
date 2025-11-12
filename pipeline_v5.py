@@ -7,121 +7,386 @@ import io
 st.set_page_config(page_title="그룹 분류 파이프라인", layout="wide")
 # 사이드바 메뉴
 st.sidebar.title("업로드 및 설정")
-st.sidebar.header("1. 파일 업로드")
-student_file = st.sidebar.file_uploader("학생 명렬표를 업로드하세요", type=["xlsx"])
-col1, col2 = st.sidebar.columns(2)
-with col1:
-    uploaded_file_1 = st.file_uploader("검사 결과 파일 업로드", type=["xlsx"])
-with col2:
-    uploaded_file_2 = st.file_uploader("", type=["xlsx"])
-
-# 파일 업로드 시
-if student_file and uploaded_file_1 and uploaded_file_2: # 두 검사 결과 파일 모두 업로드된 경우
-    student_df = pd.read_excel(student_file)
-    st.session_state['student_df'] = student_df
-    raw_df_1 = pd.read_excel(uploaded_file_1, header=[0,1])
-    raw_df_2 = pd.read_excel(uploaded_file_2, header=[0,1])
-    print(raw_df_1.columns)
-    print(raw_df_2.columns)
-    raw_df_1.columns = [f"{str(a)}_{str(b)}" if pd.notna(a) and pd.notna(b) else str(a) if pd.notna(a) else pd.notna(b) for a, b in raw_df_1.columns]
-    raw_df_2.columns = [f"{str(a)}_{str(b)}" if pd.notna(a) and pd.notna(b) else str(a) if pd.notna(a) else pd.notna(b) for a, b in raw_df_2.columns]
-    print(raw_df_1.columns)
-    print(raw_df_2.columns)
-    raw_df_1['merge_key'] = raw_df_1['학년반번호'].astype(str) + raw_df_1['성별'].astype(str) + raw_df_1['이름'].astype(str)
-    raw_df_2['merge_key'] = raw_df_2['학년반번호'].astype(str) + raw_df_2['성별'].astype(str) + raw_df_2['이름'].astype(str)
-    raw_df_1.to_excel("raw_df_1_test.xlsx", index=False)
-    raw_df_2.to_excel("raw_df_2_test.xlsx", index=False)
-
-    st.session_state['raw_df_1'] = raw_df_1
-    st.session_state['raw_df_2'] = raw_df_2
-    # 두 검사 결과 데이터프레임 병합
-    raw_df = pd.merge(raw_df_1, raw_df_2, on='merge_key', how='outer', indicator=True, suffixes=('_검사1', '_검사2'))
-    if raw_df[raw_df['_merge']=='left_only'].shape[0] > 0:
-        st.warning(f"검사1에만 있는 학생이 {raw_df[raw_df['_merge']=='left_only'].shape[0]}명 있습니다. 확인해주세요.")
-    elif raw_df[raw_df['_merge']=='right_only'].shape[0] > 0:
-        st.warning(f"검사2에만 있는 학생이 {raw_df[raw_df['_merge']=='right_only'].shape[0]}명 있습니다. 확인해주세요.")
-    else :
-        st.success("두 검사 결과가 모두 일치합니다.")
-    raw_df.drop(columns=['_merge'], inplace=True)
-    st.session_state['raw_df'] = raw_df
-    st.session_state['cols'] = raw_df.columns.tolist()
-    st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
-elif student_file and uploaded_file_1 and not uploaded_file_2: # 검사 결과 파일 1만 업로드된 경우
-    student_df = pd.read_excel(student_file)
-    st.session_state['student_df'] = student_df
-    raw_df = pd.read_excel(uploaded_file_1)
-    st.session_state['raw_df'] = raw_df
-    st.session_state['cols'] = raw_df.columns.tolist()
-    st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
-elif student_file and not uploaded_file_1 and uploaded_file_2: # 검사 결과 파일 2만 업로드된 경우
-    student_df = pd.read_excel(student_file)
-    st.session_state['student_df'] = student_df
-    raw_df = pd.read_excel(uploaded_file_2)
-    st.session_state['raw_df'] = raw_df
-    st.session_state['cols'] = raw_df.columns.tolist()
-    st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
-else:
-    st.sidebar.warning("엑셀 파일을 업로드해주세요.")
-
-#! 마케팅 및 전산팀 요청으로 기존 타입 검사를 선택할 경우
-#! 연속형 변수 및 범주형 변수가 자동 선택되도록 강제
-st.sidebar.header("2. 기존 반편성 검사 선택")
+st.sidebar.header("1. 기존 반편성 검사 선택")
 options = ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Type', 'B+C Type', 'A+C Type', 'Compact Type', 'Custom Type']
-existing_type = st.sidebar.selectbox("기존 반편성 타입 검사를 선택하세요", options=options, disabled=False, help="기존 타입 검사를 선택하면 연속형 변수와 범주형 변수가 자동으로 선택됩니다.")
-if existing_type == 'A Type-능력':
-    continuous_variable = ['종합점수']
-elif existing_type == 'B Type-인성':
-    continuous_variable = ['외향성', '신경증']
-    counseling_col = ['대인관계 힘듬', '매우 불행', '만성적 학업부진', '자긍심 낮음', '사회적 고립', '심리적 충격', '폭력 경향성', '반사회적 성향', '매우 심한 우울증', 'ADHD 가능성']
-    raw_df['상담필요'] = np.where(raw_df[counseling_col].apply(lambda row : (row == 'V').sum(), axis=1) >= 1, '1', '0')
-    st.session_state['raw_df'] = raw_df
-    discrete_variable = ['상담필요']
-elif existing_type == 'C Type-학습':
-    continuous_variable = ['LQ지수']
-elif existing_type == 'Compact Type':
-    continuous_variable = ['언어 T점수, 논리수학 T점수', '공간  T점수']
-    counseling_col = ['우울 수준', '정서충격 수준', '특이성 수준', '예민성 수준', '부정적 대인정서 수준', '과잉행동 수준']
-    raw_df['상담필요'] = np.where(raw_df[counseling_col].apply(lambda row : (row == '높음').sum(), axis=1) >= 1, '1', '0')
-    st.session_state['raw_df'] = raw_df
-    discrete_variable = ['상담필요']
-elif existing_type == 'A+B Type':
-    continuous_variable = ['외향성', '신경증', '종합점수']
-    counseling_col = ['대인관계 힘듬', '매우 불행', '만성적 학업부진', '자긍심 낮음', '사회적 고립', '심리적 충격', '폭력 경향성', '반사회적 성향', '매우 심한 우울증', 'ADHD 가능성']
-    raw_df['상담필요'] = np.where(raw_df[counseling_col].apply(lambda row : (row == 'V').sum(), axis=1) >= 1, '1', '0')
-    st.session_state['raw_df'] = raw_df
-    discrete_variable = ['상담필요']
-elif existing_type == 'B+C Type':
-    continuous_variable = ['외향성', '신경증', 'LQ지수']
-    counseling_col = ['대인관계 힘듬', '매우 불행', '만성적 학업부진', '자긍심 낮음', '사회적 고립', '심리적 충격', '폭력 경향성', '반사회적 성향', '매우 심한 우울증', 'ADHD 가능성']
-    raw_df['상담필요'] = np.where(raw_df[counseling_col].apply(lambda row : (row == 'V').sum(), axis=1) >= 1, '1', '0')
-    st.session_state['raw_df'] = raw_df
-    discrete_variable = ['상담필요']
-elif existing_type == 'A+C Type':
-    continuous_variable = ['종합점수', 'LQ지수']
+existing_type = st.sidebar.selectbox("기존 반편성 타입 검사를 선택하세요", options=options, disabled=False, help="기존 타입 검사를 선택하면 연속형 변수와 범주형 변수가 자동으로 선택됩니다.", key="existing_type_selectbox")
+st.session_state['existing_type'] = existing_type
+
+# 다중 컬럼 구조를 지닌 검사가 존재
+# 업로드된 검사 결과가 B타입 또는 Compact 타입인 경우 다중 컬럼 구조 해제
+def flatten_multiindex_columns(cols): # 다중 컬럼 구조 해제 함수
+    flatten_cols = []
+    for col_tuple in cols:
+        temp_col = []
+        for element in col_tuple:
+            if 'Unnamed' not in str(element):
+                temp_col.append(str(element))
+            else:
+                pass
+        if len(temp_col) >= 2:
+            temp_col = "_".join(map(str, temp_col))
+            flatten_cols.append(temp_col)
+        else:
+            flatten_cols.append(temp_col[0])
+    dup_count = {}
+    final_cols = []
+    for col in flatten_cols:
+        if col not in dup_count:
+            dup_count[col] = 0
+            final_cols.append(col)
+        else:
+            dup_count[col] += 1
+            new_name = f"{col}_{dup_count[col]}"
+            final_cols.append(new_name)
+    return final_cols
+## 기존 반편성 검사 선택 시와 커스텀 선택 시를 분기처리하여 통제
+if existing_type in ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Type', 'B+C Type', 'A+C Type', 'Compact Type']:
+    st.sidebar.info("기존 반편성 검사 타입이 선택되어 있습니다. 연속형 변수와 범주형 변수가 자동으로 선택됩니다.")
+    # 명렬표, 검사 결과 업로드
+    st.sidebar.header("2. 파일 업로드")
+    student_file = st.sidebar.file_uploader("학생 명렬표를 업로드하세요", type=["xlsx"], key="student_file_uploader")
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        uploaded_file_1 = st.file_uploader("검사 결과 파일 업로드", type=["xlsx"], key="uploaded_file_1_uploader")
+    with col2:
+        uploaded_file_2 = st.file_uploader("", type=["xlsx"], key="uploaded_file_2_uploader")
+    # B타입과 Compact 타입의 경우 다중 컬럼 구조를 지니고 있어 전처리가 필요함
+    # 각 타입에만 있는 컬럼명 정의
+    b_type_essential_cols = ['대인관계 힘듬', '매우 불행', '만성적 학업부진', '자긍심 낮음', '사회적 고립', '심리적 충격', '폭력 경향성', '반사회적 성향', '매우 심한 우울증', 'ADHD 가능성']
+    compact_type_essential_cols = ['기초학습역량', '타당도 지표', '외향성', '정서적 민감성']
+    # 두 검사 결과가 모두 업로드된 경우
+    if student_file and uploaded_file_1 and uploaded_file_2:
+        student_df = pd.read_excel(student_file)
+        st.session_state['student_df'] = student_df
+        raw_df_1 = pd.read_excel(uploaded_file_1)
+        raw_df_2 = pd.read_excel(uploaded_file_2)
+        if set(b_type_essential_cols) & set(raw_df_1.columns): # raw_df_1가 B타입인 경우
+            raw_df_1 = pd.read_excel(uploaded_file_1, header=[0,1])
+            raw_df_1.columns = flatten_multiindex_columns(raw_df_1.columns)
+            rename_map = {}
+            for col in raw_df_1.columns:
+                if '성별' in col and ('남' in col or '여' in col):
+                    rename_map[col] = '성별'
+            if rename_map:
+                raw_df_1.rename(columns=rename_map, inplace=True)
+        elif set(b_type_essential_cols) & set(raw_df_2.columns): # raw_df_2가 B타입인 경우
+            raw_df_2 = pd.read_excel(uploaded_file_2, header=[0,1])
+            raw_df_2.columns = flatten_multiindex_columns(raw_df_2.columns)
+            rename_map = {}
+            for col in raw_df_2.columns:
+                if '성별' in col and ('남' in col or '여' in col):
+                    rename_map[col] = '성별'
+            if rename_map:
+                raw_df_2.rename(columns=rename_map, inplace=True)
+        elif set(compact_type_essential_cols) & set(raw_df_1.columns): # raw_df_1가 Compact 타입인 경우
+            raw_df_1 = pd.read_excel(uploaded_file_1, header=[0,1,2])
+            raw_df_1.columns = flatten_multiindex_columns(raw_df_1.columns)
+            rename_map = {}
+            for col in raw_df_1.columns:
+                if '성별' in col and ('남' in col or '여' in col):
+                    rename_map[col] = '성별'
+                if '학년' in col and '반' in col and '번호' in col:
+                    rename_map[col] = '학년반번호'
+            if rename_map:
+                raw_df_1.rename(columns=rename_map, inplace=True)
+        elif set(compact_type_essential_cols) & set(raw_df_2.columns): # raw_df_2가 Compact 타입인 경우
+            raw_df_2 = pd.read_excel(uploaded_file_2, header=[0,1,2])
+            raw_df_2.columns = flatten_multiindex_columns(raw_df_2.columns)
+            rename_map = {}
+            for col in raw_df_2.columns:
+                if '성별' in col and ('남' in col or '여' in col):
+                    rename_map[col] = '성별'
+                if '학년' in col and '반' in col and '번호' in col:
+                    rename_map[col] = '학년반번호'
+            if rename_map:
+                raw_df_2.rename(columns=rename_map, inplace=True)
+        else:
+            pass
+        # b_type와 compact_type 이외의 타입인 경우 컬럼명 통일 작업
+        rename_map = {}
+        for col in raw_df_1.columns:
+            if '성별' in col and ('남' in col or '여' in col):
+                rename_map[col] = '성별'
+            if '학년' in col and '반' in col and '번호' in col:
+                rename_map[col] = '학년반번호'
+        if rename_map:
+            raw_df_1.rename(columns=rename_map, inplace=True)
+        rename_map = {}
+        for col in raw_df_2.columns:
+            if '성별' in col and ('남' in col or '여' in col):
+                rename_map[col] = '성별'
+            if '학년' in col and '반' in col and '번호' in col:
+                rename_map[col] = '학년반번호'
+        if rename_map:
+            raw_df_2.rename(columns=rename_map, inplace=True)
+        st.session_state['raw_df_1'] = raw_df_1
+        st.session_state['raw_df_2'] = raw_df_2
+        print(raw_df_2.columns)
+        raw_df_1.to_excel("raw_df_1_test.xlsx", index=False)
+        raw_df_2.to_excel("raw_df_2_test.xlsx", index=False)
+        # 두 검사 결과 데이터프레임 병합
+        raw_df_1['merge_key'] = raw_df_1['학년반번호'].astype(str) + raw_df_1['성별'].astype(str) + raw_df_1['이름'].astype(str)
+        raw_df_2['merge_key'] = raw_df_2['학년반번호'].astype(str) + raw_df_2['성별'].astype(str) + raw_df_2['이름'].astype(str)
+        raw_df = pd.merge(raw_df_1, raw_df_2, on='merge_key', how='outer', indicator=True, suffixes=('_검사1', '_검사2'))
+        raw_df.to_excel("raw_df_merged_test.xlsx", index=False)
+        if raw_df[raw_df['_merge']=='left_only'].shape[0] > 0:
+            st.sidebar.warning(f"검사1에만 있는 학생이 {raw_df[raw_df['_merge']=='left_only'].shape[0]}명 있습니다. 확인해주세요.")
+        elif raw_df[raw_df['_merge']=='right_only'].shape[0] > 0:
+            st.sidebar.warning(f"검사2에만 있는 학생이 {raw_df[raw_df['_merge']=='right_only'].shape[0]}명 있습니다. 확인해주세요.")
+        else :
+            # 학교명, 반학년번호, 성별, 이름 컬럼이 중복으로 존재하기 때문에 하나로 통일
+            st.sidebar.success("두 검사 결과가 모두 일치합니다.")
+            base_cols = ['학교명', '학년반번호', '성별', '이름']
+            for col in base_cols:
+                col1 = f"{col}_검사1"
+                col2 = f"{col}_검사2"
+                if col1 in raw_df.columns and col2 in raw_df.columns:
+                    raw_df[col] = raw_df[col1].combine_first(raw_df[col2])
+                    raw_df.drop(columns=[col1, col2], inplace=True)
+            # 통합한 열 앞으로 순서 재배치
+            cols = raw_df.columns.tolist()
+            front_cols = [col for col in base_cols if col in cols]
+            remaining_cols = [col for col in cols if col not in front_cols]
+            raw_df = raw_df[front_cols + remaining_cols]
+        raw_df.drop(columns=['_merge'], inplace=True)
+        st.session_state['raw_df'] = raw_df
+        st.session_state['cols'] = raw_df.columns.tolist()
+        st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
+    elif student_file and uploaded_file_1 and not uploaded_file_2: # 검사 결과 파일 1만 업로드된 경우
+        student_df = pd.read_excel(student_file)
+        st.session_state['student_df'] = student_df
+        raw_df = pd.read_excel(uploaded_file_1)
+        if set(b_type_essential_cols) & set(raw_df.columns): # raw_df가 B타입인 경우
+            raw_df = pd.read_excel(uploaded_file_1, header=[0,1])
+            raw_df.columns = flatten_multiindex_columns(raw_df.columns)
+            rename_map = {}
+            for col in raw_df.columns:
+                if '성별' in col and ('남' in col or '여' in col):
+                    rename_map[col] = '성별'
+            if rename_map:
+                raw_df.rename(columns=rename_map, inplace=True)
+        elif set(compact_type_essential_cols) & set(raw_df.columns): # raw_df가 Compact 타입인 경우
+            raw_df = pd.read_excel(uploaded_file_1, header=[0,1,2])
+            raw_df.columns = flatten_multiindex_columns(raw_df.columns)
+            rename_map = {}
+            for col in raw_df.columns:
+                if '성별' in col and ('남' in col or '여' in col):
+                    rename_map[col] = '성별'
+                if '학년' in col and '반' in col and '번호' in col:
+                    rename_map[col] = '학년반번호'
+            if rename_map:
+                raw_df.rename(columns=rename_map, inplace=True)
+        else:
+            pass
+        rename_map = {}
+        for col in raw_df.columns:
+            if '성별' in col and ('남' in col or '여' in col):
+                rename_map[col] = '성별'
+            if '학년' in col and '반' in col and '번호' in col:
+                rename_map[col] = '학년반번호'
+        if rename_map:
+            raw_df.rename(columns=rename_map, inplace=True)
+        raw_df['merge_key'] = raw_df['학년반번호'].astype(str) + raw_df['성별'].astype(str) + raw_df['이름'].astype(str)
+        st.session_state['raw_df'] = raw_df
+        st.session_state['cols'] = raw_df.columns.tolist()
+        st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
+    elif student_file and not uploaded_file_1 and uploaded_file_2: # 검사 결과 파일 2만 업로드된 경우
+        student_df = pd.read_excel(student_file)
+        st.session_state['student_df'] = student_df
+        raw_df = pd.read_excel(uploaded_file_2)
+        if set(b_type_essential_cols) & set(raw_df.columns): # raw_df가 B타입인 경우
+            raw_df = pd.read_excel(uploaded_file_2, header=[0,1])
+            raw_df.columns = flatten_multiindex_columns(raw_df.columns)
+            rename_map = {}
+            for col in raw_df.columns:
+                if '성별' in col and ('남' in col or '여' in col):
+                    rename_map[col] = '성별'
+            if rename_map:
+                raw_df.rename(columns=rename_map, inplace=True)
+        elif set(compact_type_essential_cols) & set(raw_df.columns): # raw_df가 Compact 타입인 경우
+            raw_df = pd.read_excel(uploaded_file_2, header=[0,1,2])
+            raw_df.columns = flatten_multiindex_columns(raw_df.columns)
+            rename_map = {}
+            for col in raw_df.columns:
+                if '성별' in col and ('남' in col or '여' in col):
+                    rename_map[col] = '성별'
+                if '학년' in col and '반' in col and '번호' in col:
+                    rename_map[col] = '학년반번호'
+            if rename_map:
+                raw_df.rename(columns=rename_map, inplace=True)
+        rename_map = {}
+        for col in raw_df.columns:
+            if '성별' in col and ('남' in col or '여' in col):
+                rename_map[col] = '성별'
+            if '학년' in col and '반' in col and '번호' in col:
+                rename_map[col] = '학년반번호'
+        if rename_map:
+            raw_df.rename(columns=rename_map, inplace=True)
+        raw_df['merge_key'] = raw_df['학년반번호'].astype(str) + raw_df['성별'].astype(str) + raw_df['이름'].astype(str)
+        st.session_state['raw_df'] = raw_df
+        st.session_state['cols'] = raw_df.columns.tolist()
+        st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
+    else:
+        st.sidebar.warning("엑셀 파일을 업로드해주세요.")
+elif existing_type == 'Custom Type': # 커스텀 타입 선택 시
+    st.sidebar.info("커스텀 타입이 선택되어 있습니다. 연속형 변수와 범주형 변수를 직접 선택해주세요.")
+    st.sidebar.header("2. 파일 업로드")
+    # 명렬표, 검사 결과 업로드
+    student_file = st.sidebar.file_uploader("학생 명렬표를 업로드하세요", type=["xlsx"], key="student_file_uploader")
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        uploaded_file_1 = st.file_uploader("검사 결과 파일 업로드", type=["xlsx"], key="uploaded_file_1_uploader")
+    with col2:
+        uploaded_file_2 = st.file_uploader("", type=["xlsx"], key="uploaded_file_2_uploader")
+    # 두 검사 결과가 모두 업로드된 경우
+    if student_file and uploaded_file_1 and uploaded_file_2:
+        student_df = pd.read_excel(student_file)
+        st.session_state['student_df'] = student_df
+        raw_df_1 = pd.read_excel(uploaded_file_1)
+        raw_df_2 = pd.read_excel(uploaded_file_2)
+        raw_df_1['merge_key'] = raw_df_1['학년반번호'].astype(str) + raw_df_1['성별'].astype(str) + raw_df_1['이름'].astype(str)
+        raw_df_2['merge_key'] = raw_df_2['학년반번호'].astype(str) + raw_df_2['성별'].astype(str) + raw_df_2['이름'].astype(str)
+        raw_df_1.to_excel("raw_df_1_test.xlsx", index=False)
+        raw_df_2.to_excel("raw_df_2_test.xlsx", index=False)
+        st.session_state['raw_df_1'] = raw_df_1
+        st.session_state['raw_df_2'] = raw_df_2
+        # 두 검사 결과 데이터프레임 병합
+        raw_df = pd.merge(raw_df_1, raw_df_2, on='merge_key', how='outer', indicator=True, suffixes=('_검사1', '_검사2'))
+        if raw_df[raw_df['_merge']=='left_only'].shape[0] > 0:
+            st.sidebar.warning(f"검사 간 학생 명단이 일치하지 않습니다. 확인해주세요.")
+        elif raw_df[raw_df['_merge']=='right_only'].shape[0] > 0:
+            st.sidebar.warning(f"검사 간 학생 명단이 일치하지 않습니다. 확인해주세요.")
+        else :
+            st.sidebar.success("두 검사 결과가 모두 일치합니다.")
+            base_cols = ['학교명', '학년반번호', '성별', '이름']
+            for col in base_cols:
+                col1 = f"{col}_검사1"
+                col2 = f"{col}_검사2"
+                if col1 in raw_df.columns and col2 in raw_df.columns:
+                    raw_df[col] = raw_df[col1].combine_first(raw_df[col2])
+                    raw_df.drop(columns=[col1, col2], inplace=True)
+            # 통합한 열 앞으로 순서 재배치
+            cols = raw_df.columns.tolist()
+            front_cols = [col for col in base_cols if col in cols]
+            remaining_cols = [col for col in cols if col not in front_cols]
+            raw_df = raw_df[front_cols + remaining_cols]
+        raw_df.drop(columns=['_merge'], inplace=True)
+        st.session_state['raw_df'] = raw_df
+        st.session_state['cols'] = raw_df.columns.tolist()
+        st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
+    elif student_file and uploaded_file_1 and not uploaded_file_2: # 검사 결과 파일 1만 업로드된 경우
+        student_df = pd.read_excel(student_file)
+        st.session_state['student_df'] = student_df
+        raw_df = pd.read_excel(uploaded_file_1)
+        raw_df['merge_key'] = raw_df['학년반번호'].astype(str) + raw_df['성별'].astype(str) + raw_df['이름'].astype(str)
+        st.session_state['raw_df'] = raw_df
+        st.session_state['cols'] = raw_df.columns.tolist()
+        st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
+    elif student_file and not uploaded_file_1 and uploaded_file_2: # 검사 결과 파일 2만 업로드된 경우
+        student_df = pd.read_excel(student_file)
+        st.session_state['student_df'] = student_df
+        raw_df = pd.read_excel(uploaded_file_2)
+        raw_df['merge_key'] = raw_df['학년반번호'].astype(str) + raw_df['성별'].astype(str) + raw_df['이름'].astype(str)
+        st.session_state['raw_df'] = raw_df
+        st.session_state['cols'] = raw_df.columns.tolist()
+        st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
+    else:
+        st.sidebar.warning("엑셀 파일을 업로드해주세요.")
 else :
     pass
-    
-# 변수 선택
+
 st.sidebar.header("3. 변수 선택")
-continuous_variable = st.sidebar.multiselect(
-    "연속형 변수를 선택하세요",
-    options=st.session_state.get('cols', []),
-    help="시험 점수와 같은 연속형 변수를 선택하세요.")
-if continuous_variable:
-    st.session_state['continuous_variable'] = continuous_variable
-    st.sidebar.success("변수 선택이 완료되었습니다.")
-else:
-    st.sidebar.warning("변수를 선택해주세요.")
+# 기존 반편성 검사 선택 시 연속형 변수 및 범주형 변수 강제 선택
+if 'prev_existing_type' not in st.session_state:
+    st.session_state['prev_existing_type'] = existing_type
+if st.session_state['prev_existing_type'] != existing_type:
+    print(f'{existing_type} existing type changed, rerunning...')
+    st.session_state['prev_existing_type'] = existing_type
+    st.rerun()
+try:
+    if existing_type == 'A Type-능력': # 연속형만
+        continuous_variable_default = ['종합지수']
+        discrete_variable_default = []
+    elif existing_type == 'B Type-인성': # 연속형 + 이산형
+        print('b type selected')
+        continuous_variable_default = ['5요인_외향성', '5요인_신경증']
+        discrete_variable_default = ['상담필요']
+        counseling_col = ['대인관계 힘듬', '매우 불행', '만성적 학업부진', '자긍심 낮음', '사회적 고립', '심리적 충격', '폭력 경향성', '반사회적 성향', '매우 심한 우울증', 'ADHD 가능성']
+        st.session_state['continuous_variable_default'] = continuous_variable_default
+        st.session_state['discrete_variable_default'] = discrete_variable_default
+        raw_df['상담필요'] = np.where(raw_df[counseling_col].apply(lambda row : (row == 'V').sum(), axis=1) >= 1, '1', '0')
+        st.session_state['raw_df'] = raw_df
+        st.session_state['cols'] = raw_df.columns.tolist()
+    elif existing_type == 'C Type-학습': # 연속형만
+        continuous_variable_default = ['LQ지수']
+        discrete_variable_default = []
+    elif existing_type == 'Compact Type': # 연속형 + 이산형
+        continuous_variable_default = ['기초학습역량_언어_T점수', '기초학습역량_논리수학_T점수', '기초학습역량_공간_T점수']
+        discrete_variable_default = ['상담필요']
+        counseling_col = ['우울 수준', '정서충격 수준', '특이성 수준', '예민성 수준', '부정적 대인정서 수준', '과잉행동 수준']
+        st.session_state['continuous_variable_default'] = continuous_variable_default
+        st.session_state['discrete_variable_default'] = discrete_variable_default
+        raw_df['상담필요'] = np.where(raw_df[counseling_col].apply(lambda row : (row == '높음').sum(), axis=1) >= 1, '1', '0')
+        st.session_state['raw_df'] = raw_df
+        st.session_state['cols'] = raw_df.columns.tolist()
+    elif existing_type == 'A+B Type': # 연속형 + 이산형
+        continuous_variable_default = ['5요인_외향성', '5요인_신경증', '종합지수']
+        counseling_col = ['대인관계 힘듬', '매우 불행', '만성적 학업부진', '자긍심 낮음', '사회적 고립', '심리적 충격', '폭력 경향성', '반사회적 성향', '매우 심한 우울증', 'ADHD 가능성']
+        discrete_variable_default = ['상담필요']
+        st.session_state['continuous_variable_default'] = continuous_variable_default
+        st.session_state['discrete_variable_default'] = discrete_variable_default
+        raw_df['상담필요'] = np.where(raw_df[counseling_col].apply(lambda row : (row == 'V').sum(), axis=1) >= 1, '1', '0')
+        st.session_state['raw_df'] = raw_df
+        st.session_state['cols'] = raw_df.columns.tolist()
+    elif existing_type == 'B+C Type': # 연속형 + 이산형
+        continuous_variable_default = ['5요인_외향성', '5요인_신경증', 'LQ지수']
+        counseling_col = ['대인관계 힘듬', '매우 불행', '만성적 학업부진', '자긍심 낮음', '사회적 고립', '심리적 충격', '폭력 경향성', '반사회적 성향', '매우 심한 우울증', 'ADHD 가능성']
+        discrete_variable_default = ['상담필요']
+        st.session_state['continuous_variable_default'] = continuous_variable_default
+        st.session_state['discrete_variable_default'] = discrete_variable_default
+        raw_df['상담필요'] = np.where(raw_df[counseling_col].apply(lambda row : (row == 'V').sum(), axis=1) >= 1, '1', '0')
+        st.session_state['raw_df'] = raw_df
+        st.session_state['cols'] = raw_df.columns.tolist()
+    elif existing_type == 'A+C Type': # 연속형만
+        continuous_variable_default = ['종합지수', 'LQ지수']
+        discrete_variable_default = []
+    else :
+        discrete_variable_default = []
+    st.session_state['continuous_variable_default'] = continuous_variable_default
+    st.session_state['discrete_variable_default'] = discrete_variable_default
+except:
+    pass
+
+# 연속형 변수 선택
+print('existing_type:', existing_type)
+print('continuous_variable_default:', st.session_state.get('continuous_variable_default', []))
+print('discrete_variable_default:', st.session_state.get('discrete_variable_default', []))
+try:
+    continuous_variable = st.sidebar.multiselect(
+        "연속형 변수를 선택하세요",
+        options=st.session_state.get('cols', []) if 'cols' in st.session_state else st.session_state['continuous_variable_default'],
+        default=st.session_state['continuous_variable_default'] if existing_type != 'Custom Type' else None,
+        help="시험 점수와 같은 연속형 변수를 선택하세요.", key="continuous_variable_multiselect")
+    if continuous_variable:
+        st.session_state['continuous_variable'] = continuous_variable
+        st.sidebar.success("변수 선택이 완료되었습니다.")
+    else:
+        st.sidebar.warning("변수를 선택해주세요.")
+    # 범주형 변수 선택
     discrete_variable = st.sidebar.multiselect(
-    "범주형 변수를 선택하세요",
-    options=st.session_state.get('cols', []),
-    help="성별과 같은 범주형 변수를 선택하세요.")
-if discrete_variable:
-    st.session_state['discrete_variable'] = discrete_variable
-    st.sidebar.success("변수 선택이 완료되었습니다.")
-else:
-    st.session_state['discrete_variable'] = []
-    st.sidebar.warning("변수를 선택해주세요.")
+        "범주형 변수를 선택하세요",
+        options=st.session_state.get('cols', []) if 'cols' in st.session_state else st.session_state['discrete_variable_default'],
+        default=st.session_state['discrete_variable_default'] if existing_type != 'Custom Type' else None,
+        help="성별과 같은 범주형 변수를 선택하세요.", key="discrete_variable_multiselect")
+    if discrete_variable:
+        st.session_state['discrete_variable'] = discrete_variable
+        st.sidebar.success("변수 선택이 완료되었습니다.")
+    else:
+        st.session_state['discrete_variable'] = []
+        st.sidebar.warning("변수를 선택해주세요.")
+except:
+    pass
+
 # =============== 본문 영역 ===============
 st.title("🔧 그룹 분류 파이프라인")
 
@@ -152,15 +417,16 @@ with tabs[0]:
         student_df['이름'] = student_df['이름'].astype(str)
         student_df['merge_key'] = student_df['학년'] + student_df['임시반'] + student_df['임시번호'] + student_df['성별'] + student_df['이름']
 
+        #! 앞단에서 모두 생성함
         # 검사 결과 프레임에서 병합할 열 만들기
         # 학년반번호(5자리) + 성별(1자리) + 이름
-        raw_df['학년반번호'] = raw_df['학년반번호'].astype(str)
-        if raw_df['성별'].dtype == 'O':  # object 타입(문자열)이면 변환
-            raw_df['성별'] = raw_df['성별'].map({'남': '1', '여': '2'}).astype(str)
-        else:
-            raw_df['성별'] = raw_df['성별'].astype(str)
-        raw_df['이름'] = raw_df['이름'].astype(str)
-        raw_df['merge_key'] = raw_df['학년반번호'] + raw_df['성별'] + raw_df['이름']
+        # raw_df['학년반번호'] = raw_df['학년반번호'].astype(str)
+        # if raw_df['성별'].dtype == 'O':  # object 타입(문자열)이면 변환
+        #     raw_df['성별'] = raw_df['성별'].map({'남': '1', '여': '2'}).astype(str)
+        # else:
+        #     raw_df['성별'] = raw_df['성별'].astype(str)
+        # raw_df['이름'] = raw_df['이름'].astype(str)
+        # raw_df['merge_key'] = raw_df['학년반번호'] + raw_df['성별'] + raw_df['이름']
 
         # merge_key 열을 기준으로 병합 후
         # 병합된 데이터프레임 표시
@@ -230,7 +496,7 @@ with tabs[0]:
 
 # [1] 변수 생성 탭
 with tabs[1]:
-
+    st.header("변수 생성")
     # 계산 목록 정의
     available_calculations = {
         '합계': 'sum',
@@ -243,7 +509,7 @@ with tabs[1]:
     }
 
     #st.header("변수 생성")
-    st.write("메타 설정에서 선택한 변수를 활용해 변수를 생성할 수 있습니다.")
+    st.write("설정에서 선택한 변수를 활용해 변수를 생성할 수 있습니다.")
     # 생성할 변수 갯수
     num_variables = st.number_input("생성할 변수의 개수를 입력하세요", min_value=1, max_value=10, value=1)
     # 변수 생성 입력 필드
@@ -309,7 +575,8 @@ with tabs[1]:
         # 데이터프레임 표시
         st.dataframe(df.head(10), use_container_width=True)
     else:
-        pass
+        st.session_state['available_continuous_variables'] = st.session_state['continuous_variable']
+        st.session_state['available_discrete_variables'] = st.session_state['discrete_variable']
 
 # [2] 분류 알고리즘
 with tabs[2]:
@@ -343,7 +610,7 @@ with tabs[2]:
                 help="정렬하고자 하는 변수의 개수를 입력하세요."
             )
             for n in range(sortable_variable_number):
-                st.subheader(f"{n+1}번째 정렬 변수")
+                st.subheader(f"{n+1}순위 정렬 변수")
                 # 정렬 변수 선택
                 sort_variable = st.selectbox(
                     f"정렬 변수 선택",
@@ -1767,5 +2034,5 @@ with tabs[7]:
     st.success("최종 그룹 배정 결과가 엑셀 파일로 저장되었습니다.")
 
 
-# streamlit run c:/Users/USER/group_classification/pipeline_v4.py
-# streamlit run /Users/mac/insight_/group_classification/pipeline_v4.py
+# streamlit run c:/Users/USER/group_classification/pipeline_v5.py
+# streamlit run /Users/mac/insight_/group_classification/pipeline_v5.py
