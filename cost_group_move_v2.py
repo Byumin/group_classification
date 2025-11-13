@@ -747,12 +747,7 @@ def cost_group_move(max_iter, tolerance, w_discrete, w_continuous, init_grouped_
                 # 이동 기록 업데이트
                 # move_history.append(move_key)
                 # 이동 후 비용 계산
-                print("askjdhjkxakhjlchjklvaskhjlvakjlhsvadjklvadkjlasjklv")
                 new_group_mean = init_grouped_df.groupby('초기그룹')[selected_sort_variable].mean()
-                print("askjdhjkxakhjlchjklvaskhjlvakjlhsvadjklvadkjlasjklv")
-                print(new_group_mean)
-                print(new_group_mean.dtypes)
-                print(new_pop_mean, type(new_pop_mean))
                 new_pop_mean = init_grouped_df[selected_sort_variable].mean()
                 new_diff_cost = sum([abs(gm - new_pop_mean) for gm in new_group_mean]) # 그룹 별 평균과 전체 평균의 차이의 절대값 합
                 group_freq = compute_group_discrete_freq(init_grouped_df, selected_discrete_variable)

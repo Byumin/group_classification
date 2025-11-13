@@ -302,7 +302,6 @@ if 'prev_existing_type' not in st.session_state:
 if st.session_state['prev_existing_type'] != existing_type:
     print(f'{existing_type} existing type changed, rerunning...')
     st.session_state['prev_existing_type'] = existing_type
-    st.rerun()
 try:
     if existing_type == 'A Type-능력': # 연속형만
         continuous_variable_default = ['종합지수']
@@ -1741,8 +1740,16 @@ with tabs[6]:
     final_sex_choice = st.session_state['sex_classification']
     final_subject_choice = st.session_state['subject_based_classification']
     df = st.session_state['final_group_assign_df']
-    all_students = sorted(df['merge_key'].unique().tolist())
-    selected_student = st.selectbox("이동할 학생 선택", all_students)
+    selected_discrete_variable = st.session_state.get('selected_discrete_variable', [])
+    selected_discrete_variable = ['성별_명렬표' if var == '성별' else var for var in selected_discrete_variable]
+    selected_sort_variable = st.session_state.get('selected_sort_variable_dict', {}).keys()
+    # 이동할 그룹 선택
+    source_group_no = st.selectbox("이동시킬 그룹 선택", list(map(int, sorted(df['초기그룹'].unique().tolist()))))
+    # 해당 그룹의 학생들만 필터링
+    source_group_df = df[df['초기그룹'] == source_group_no]
+    st.dataframe(source_group_df[['이름_명렬표']+selected_discrete_variable+list(selected_sort_variable)], use_container_width=True)
+    # 이동할 학생 선택
+    selected_student = st.selectbox(f"{source_group_no}번 그룹에서 이동할 학생 선택", sorted(source_group_df['merge_key'].unique().tolist()))
     # 선택한 학생의 필터링된 그룹 리스트 생성
     ## 케이스별 groupby 기준 설정
     if final_sex_choice == '분반' and final_subject_choice == '예':
@@ -1774,8 +1781,7 @@ with tabs[6]:
         exception_candidate_groups = df.loc[df['초기그룹'] != selected_row['초기그룹'], '초기그룹'].unique().tolist()
         exception_candidate_groups = [int(g_n) for g_n in exception_candidate_groups]
     current_group = int(df.loc[df['merge_key'] == selected_student, '초기그룹'].values[0])
-    st.write(f"현재 그룹: **{current_group}**")
-    target_group = st.selectbox("이동할 대상 그룹 선택", exception_candidate_groups)
+    target_group = st.selectbox("이동할 대상 그룹 선택", sorted(exception_candidate_groups))
 
     # 이동 시뮬레이션 버튼
     if st.button("이동 시뮬레이션 실행"):
@@ -1876,14 +1882,13 @@ with tabs[6]:
 
     st.divider()
     st.markdown("#### 학생 교환 시뮬레이션")
-    st.write("선택한 학생과 다른 그룹의 유사한 학생을 교환하여 평균 및 분포 변화를 비교합니다.")
+    st.write("선택한 학생과 다른 그룹의 유사한 학생을 교환하여 평균 및 분포를 보완합니다.")
     # 유사도 판단용 변수
     selected_discrete_for_swap = st.multiselect("교환 유사도 판단용 이산형 변수 선택", discrete_vars)
     selected_continuous_for_swap = st.selectbox("교환 유사도 판단용 연속형 변수 선택", continuous_vars)
     if st.button("교환 시뮬레이션 실행"):
         # 선택한 그룹에서 유사한 학생 탐색
         target_df = df[df['초기그룹'] == target_group].copy()
-        
         ## 선택한 학생의 이산형 정보와 동일한 학생 필터링
         filter_df = pd.DataFrame([selected_row[selected_discrete_for_swap].to_dict()])
         filtered_df = target_df.merge(filter_df, on=selected_discrete_for_swap, how='inner')
@@ -1891,7 +1896,19 @@ with tabs[6]:
         if filtered_df.empty:
             st.warning("교환할 유사한 학생이 없습니다.")
         else:
-            # 연속형 변수 기준으로 가장 가까운 학생 탐색
+            # 연속형 변수 기준으로 교환했을 때 이상적인 평균에 가장 근접한 학생 선택
+            ideal_continuous_mean = df[selected_continuous_for_swap].mean()
+            sim_pair_diffs = []
+            for idx, row in filtered_df.iterrows():
+                sim_df = df.copy(deep=True)
+                sim_df.loc[sim_df['merge_key'] == selected_student, '초기그룹'] = row['초기그룹']
+                sim_df.loc[sim_df['merge_key'] == row['merge_key'], '초기그룹'] = current_group
+                new_mean = abs(ideal_continuous_mean - sim_df.loc[sim_df['초기그룹']==current_group, selected_continuous_for_swap].mean())+abs(ideal_continuous_mean - sim_df.loc[sim_df['초기그룹']==target_group, selected_continuous_for_swap].mean())
+                sim_pair_diffs.append((row['merge_key'], new_mean))
+            # new_mean 기준으로 최소값 선택
+            sim_pair_diffs.sort(key=lambda x: x[1])
+            best_swap_key = sim_pair_diffs[0][0]
+            swap_candidate = filtered_df[filtered_df['merge_key'] == best_swap_key].iloc[0]
             selected_value = selected_row[selected_continuous_for_swap]
             filtered_df['차이'] = (filtered_df[selected_continuous_for_swap] - selected_value).abs()
             swap_candidate = filtered_df.nsmallest(1, '차이').iloc[0]
