@@ -302,7 +302,6 @@ if 'prev_existing_type' not in st.session_state:
 if st.session_state['prev_existing_type'] != existing_type:
     print(f'{existing_type} existing type changed, rerunning...')
     st.session_state['prev_existing_type'] = existing_type
-    st.rerun()
 try:
     if existing_type == 'A Type-능력': # 연속형만
         continuous_variable_default = ['종합지수']
@@ -816,7 +815,7 @@ with tabs[3]:
         try:
             if all(k in st.session_state for k in ['merged_df', 'selected_algorithm', 'selected_sort_variable_dict', 'selected_discrete_variable', 'sex_classification', 'group_count', 'subject_based_classification', 'absent_student_handling', 'special_student_handling', 'school_based_classification']):
                 from init_group_assign import tuple_from_df, suitable_bin_value, init_group_assign
-                from cost_group_move_v2 import compute_ideal_discrete_freq, cost_group_move_v2, compute_group_discrete_freq, compute_group_total_cost, compute_group_diff_and_sign, compute_continuous_cost, compute_discrete_cost
+                from cost_group_move_v2 import compute_ideal_discrete_freq, cost_group_move, compute_group_discrete_freq, compute_group_total_cost, compute_group_diff_and_sign, compute_continuous_cost, compute_discrete_cost
                 # 병합된 데이터프레임 불러오기
                 df = st.session_state['merged_df'] # 앞에서 결시생, 동명이인 처리까지 완료된 데이터프레임
                 # 사용자가 성별을 선택한 경우 병합 후에 성별_명렬표로 명시
@@ -896,7 +895,7 @@ with tabs[3]:
                     group_assign_df['초기그룹'] = group_assign
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
-                    group_assign_df = cost_group_move_v2(50, 0.5, 100, 50, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move(50, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 그룹 분류가 완료되었습니다.")
                     group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False) #! 초기 그룹 배정 저장
@@ -924,7 +923,7 @@ with tabs[3]:
                         group_assign_df = pd.concat([group_assign_df, subject_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
-                    group_assign_df = cost_group_move_v2(50, 0.5, 100, 50, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move(50, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 그룹 분류가 완료되었습니다.")
                     group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False)
@@ -954,7 +953,7 @@ with tabs[3]:
                             selected_discrete_variable.remove("성별_명렬표")
                         else:
                             pass
-                        gender_group_assign_df = cost_group_move_v2(50, 0.5, 100, 50, gender_df, selected_discrete_variable, selected_sort_variable_dict)
+                        gender_group_assign_df = cost_group_move(50, 0.5, 100, 1, gender_df, selected_discrete_variable, selected_sort_variable_dict)
                         group_assign_df = pd.concat([group_assign_df, gender_group_assign_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 그룹 분류가 완료되었습니다.")
@@ -985,7 +984,7 @@ with tabs[3]:
                             selected_discrete_variable.remove("성별_명렬표")
                         else:
                             pass
-                        gender_subject_df = cost_group_move_v2(50, 0.5, 100, 50, gender_subject_df, selected_discrete_variable, selected_sort_variable_dict)
+                        gender_subject_df = cost_group_move(50, 0.5, 100, 1, gender_subject_df, selected_discrete_variable, selected_sort_variable_dict)
                         group_assign_df = pd.concat([group_assign_df, gender_subject_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 그룹 분류가 완료되었습니다.")
@@ -1005,7 +1004,7 @@ with tabs[3]:
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
                     print('초기 배정 병합 후 이산형 변수 열 확인', )
-                    group_assign_df = cost_group_move_v2(50, 0.5, 100, 50, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move(50, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 그룹 분류가 완료되었습니다.")
                     group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False)
@@ -1030,7 +1029,7 @@ with tabs[3]:
                         # group_assign과 subject_df 병합
                         subject_df['초기그룹'] = subject_group_assign
                         # cost 함수 기반으로 그룹 배정 최적화
-                        subject_group_assign_df = cost_group_move_v2(50, 0.5, 100, 50, subject_df, selected_discrete_variable, selected_sort_variable_dict)
+                        subject_group_assign_df = cost_group_move(50, 0.5, 100, 1, subject_df, selected_discrete_variable, selected_sort_variable_dict)
                         group_assign_df = pd.concat([group_assign_df, subject_group_assign_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 그룹 분류가 완료되었습니다.")
@@ -1524,7 +1523,7 @@ with tabs[4]:
                     assign_relation_groups_optimal,
                     merge_optimal_assignments
                 )
-                from cost_group_move_v2 import cost_group_move_v2
+                from cost_group_move_v2 import cost_group_move
 
                 # 케이스별 groupby 기준 설정
                 sex_cls = st.session_state['sex_classification']
@@ -1583,7 +1582,7 @@ with tabs[4]:
                         final_df = merge_optimal_assignments(remaining_df, best_assignment, relationship_group_df_dict)
 
                         # 그룹 내 균형 조정
-                        final_df = cost_group_move_v2(
+                        final_df = cost_group_move(
                             50, 0.01, 100, 1,
                             final_df,
                             selected_discrete_variable,
@@ -1605,7 +1604,7 @@ with tabs[4]:
                         group_assign_df, relationship_group_dict, relationship_group_df_dict, selected_discrete_variable
                     )
                     final_df = merge_optimal_assignments(remaining_df, best_assignment, relationship_group_df_dict)
-                    final_df = cost_group_move_v2(
+                    final_df = cost_group_move(
                         50, 0.01, 100, 1,
                         final_df,
                         selected_discrete_variable,
@@ -1735,51 +1734,57 @@ with tabs[5]:
 with tabs[6]:
     import plotly.express as px
     import plotly.graph_objects as go
-    # 이동 및 교환 시뮬레이션
-    st.markdown("#### 학생 이동 시뮬레이션")
-    st.write("특정 학생을 다른 그룹으로 이동시켜 평균 및 빈도 변화 시뮬레이션을 수행할 수 있습니다.")
-    final_sex_choice = st.session_state['sex_classification']
-    final_subject_choice = st.session_state['subject_based_classification']
-    df = st.session_state['final_group_assign_df']
-    all_students = sorted(df['merge_key'].unique().tolist())
-    selected_student = st.selectbox("이동할 학생 선택", all_students)
-    # 선택한 학생의 필터링된 그룹 리스트 생성
-    ## 케이스별 groupby 기준 설정
-    if final_sex_choice == '분반' and final_subject_choice == '예':
-        groupby_cols = ['성별_명렬표', '선택과목']
-    elif final_sex_choice == '분반' and final_subject_choice == '아니오':
-        groupby_cols = ['성별_명렬표']
-    elif final_sex_choice == '합반' and final_subject_choice == '예':
-        groupby_cols = ['선택과목']
-    elif final_sex_choice == '합반' and final_subject_choice == '아니오':
-        groupby_cols = [] # 전체 그룹 대상으로
-    elif final_sex_choice in ['남학교', '여학교'] and final_subject_choice == '예':
-        groupby_cols = ['선택과목']
-    elif final_sex_choice in ['남학교', '여학교'] and final_subject_choice == '아니오':
-        groupby_cols = [] # 전체 그룹 대상이지만 남학교/여학교로 성별은 이미 하나임
-    else:
-        groupby_cols = []
-    selected_row = df[df['merge_key'] == selected_student].iloc[0]
-    if groupby_cols:
-        # 선택한 학생이 속한 그룹 키
-        group_keys = tuple(selected_row[col] for col in groupby_cols)
-        # 전체 그룹
-        all_group_df = df.groupby(groupby_cols)
-        # 같은 그룹 키를 가진 학생들만 필터링
-        candidate_groups_df = all_group_df.get_group(group_keys)
-        # 선택한 학생이 속한 그룹 제외
-        exception_candidate_groups = candidate_groups_df.loc[candidate_groups_df['초기그룹'] != selected_row['초기그룹'], '초기그룹'].unique().tolist()
-        exception_candidate_groups = [int(g_n) for g_n in exception_candidate_groups]
-    else:
-        exception_candidate_groups = df.loc[df['초기그룹'] != selected_row['초기그룹'], '초기그룹'].unique().tolist()
-        exception_candidate_groups = [int(g_n) for g_n in exception_candidate_groups]
-    current_group = int(df.loc[df['merge_key'] == selected_student, '초기그룹'].values[0])
-    st.write(f"현재 그룹: **{current_group}**")
-    target_group = st.selectbox("이동할 대상 그룹 선택", exception_candidate_groups)
-
-    # 이동 시뮬레이션 버튼
-    if st.button("이동 시뮬레이션 실행"):
-        st.info("선택한 학생을 다른 그룹으로 이동할 수 있습니다.")
+    move_swap_choice = st.selectbox('특정 학생을 이동할지 교환할지 선택해주세요.' , ['학생 이동', '학생 교환'], key='move_or_swap_choice')
+    st.session_state['move_or_swap_choice'] = move_swap_choice
+    if st.session_state['move_or_swap_choice'] == '학생 이동':
+        st.markdown("#### 학생 이동 시뮬레이션")
+        st.write("특정 학생을 다른 그룹으로 이동시켜 평균 및 빈도 변화 시뮬레이션을 수행할 수 있습니다.")
+        final_sex_choice = st.session_state['sex_classification']
+        final_subject_choice = st.session_state['subject_based_classification']
+        df = st.session_state['final_group_assign_df']
+        selected_discrete_variable = st.session_state.get('selected_discrete_variable', [])
+        selected_discrete_variable = ['성별_명렬표' if var == '성별' else var for var in selected_discrete_variable]
+        selected_sort_variable = st.session_state.get('selected_sort_variable_dict', {}).keys()
+        # 이동할 그룹 선택
+        source_group_no = st.selectbox("이동시킬 그룹 선택", list(map(int, sorted(df['초기그룹'].unique().tolist()))))
+        # 해당 그룹의 학생들만 필터링
+        source_group_df = df[df['초기그룹'] == source_group_no]
+        st.dataframe(source_group_df[['이름_명렬표']+selected_discrete_variable+list(selected_sort_variable)], use_container_width=True)
+        # 이동할 학생 선택
+        selected_student = st.selectbox(f"{source_group_no}번 그룹에서 이동할 학생 선택", sorted(source_group_df['merge_key'].unique().tolist()))
+        # 선택한 학생의 필터링된 그룹 리스트 생성
+        ## 케이스별 groupby 기준 설정
+        if final_sex_choice == '분반' and final_subject_choice == '예':
+            groupby_cols = ['성별_명렬표', '선택과목']
+        elif final_sex_choice == '분반' and final_subject_choice == '아니오':
+            groupby_cols = ['성별_명렬표']
+        elif final_sex_choice == '합반' and final_subject_choice == '예':
+            groupby_cols = ['선택과목']
+        elif final_sex_choice == '합반' and final_subject_choice == '아니오':
+            groupby_cols = [] # 전체 그룹 대상으로
+        elif final_sex_choice in ['남학교', '여학교'] and final_subject_choice == '예':
+            groupby_cols = ['선택과목']
+        elif final_sex_choice in ['남학교', '여학교'] and final_subject_choice == '아니오':
+            groupby_cols = [] # 전체 그룹 대상이지만 남학교/여학교로 성별은 이미 하나임
+        else:
+            groupby_cols = []
+        selected_row = df[df['merge_key'] == selected_student].iloc[0]
+        if groupby_cols:
+            # 선택한 학생이 속한 그룹 키
+            group_keys = tuple(selected_row[col] for col in groupby_cols)
+            # 전체 그룹
+            all_group_df = df.groupby(groupby_cols)
+            # 같은 그룹 키를 가진 학생들만 필터링
+            candidate_groups_df = all_group_df.get_group(group_keys)
+            # 선택한 학생이 속한 그룹 제외
+            exception_candidate_groups = candidate_groups_df.loc[candidate_groups_df['초기그룹'] != selected_row['초기그룹'], '초기그룹'].unique().tolist()
+            exception_candidate_groups = [int(g_n) for g_n in exception_candidate_groups]
+        else:
+            exception_candidate_groups = df.loc[df['초기그룹'] != selected_row['초기그룹'], '초기그룹'].unique().tolist()
+            exception_candidate_groups = [int(g_n) for g_n in exception_candidate_groups]
+        current_group = int(df.loc[df['merge_key'] == selected_student, '초기그룹'].values[0]) # 출발 그룹 번호
+        target_group = st.selectbox("이동할 대상 그룹 선택", sorted(exception_candidate_groups)) # 도착할 그룹 선택 -> 도착 그룹 번호
+        # 가상 이동 수행
         sim_df = df.copy(deep=True)
         sim_df.loc[sim_df['merge_key'] == selected_student, '초기그룹'] = target_group
         # 이동 전후 평균 비교
@@ -1860,9 +1865,6 @@ with tabs[6]:
                 )
 
                 st.plotly_chart(fig_stacked, use_container_width=True)
-
-        # ③ 적용 및 취소 기능
-        st.markdown("---")
         col1, col2 = st.columns(2)
         with col1:
             if st.button("✅ 변경 적용"):
@@ -1873,40 +1875,102 @@ with tabs[6]:
         with col2:
             if st.button("↩️ 변경 취소"):
                 st.session_state['final_group_assign_df'] = df
+                st.info("이동이 취소되고 원래 그룹 배정으로 복원되었습니다.")
+    elif st.session_state['move_or_swap_choice'] == '학생 교환':
+        st.markdown("#### 학생 이동 시뮬레이션")
+        st.write("특정 학생을 다른 그룹으로 이동시켜 평균 및 빈도 변화 시뮬레이션을 수행할 수 있습니다.")
+        final_sex_choice = st.session_state['sex_classification']
+        final_subject_choice = st.session_state['subject_based_classification']
+        df = st.session_state['final_group_assign_df']
+        selected_discrete_variable = st.session_state.get('selected_discrete_variable', [])
+        selected_discrete_variable = ['성별_명렬표' if var == '성별' else var for var in selected_discrete_variable]
+        selected_sort_variable = st.session_state.get('selected_sort_variable_dict', {}).keys()
+        # 이동할 그룹 선택
+        source_group_no = st.selectbox("이동시킬 그룹 선택", list(map(int, sorted(df['초기그룹'].unique().tolist()))))
+        # 해당 그룹의 학생들만 필터링
+        source_group_df = df[df['초기그룹'] == source_group_no]
+        st.dataframe(source_group_df[['이름_명렬표']+selected_discrete_variable+list(selected_sort_variable)], use_container_width=True)
+        # 이동할 학생 선택
+        selected_student = st.selectbox(f"{source_group_no}번 그룹에서 이동할 학생 선택", sorted(source_group_df['merge_key'].unique().tolist()))
+        # 선택한 학생의 필터링된 그룹 리스트 생성
+        ## 케이스별 groupby 기준 설정
+        if final_sex_choice == '분반' and final_subject_choice == '예':
+            groupby_cols = ['성별_명렬표', '선택과목']
+        elif final_sex_choice == '분반' and final_subject_choice == '아니오':
+            groupby_cols = ['성별_명렬표']
+        elif final_sex_choice == '합반' and final_subject_choice == '예':
+            groupby_cols = ['선택과목']
+        elif final_sex_choice == '합반' and final_subject_choice == '아니오':
+            groupby_cols = [] # 전체 그룹 대상으로
+        elif final_sex_choice in ['남학교', '여학교'] and final_subject_choice == '예':
+            groupby_cols = ['선택과목']
+        elif final_sex_choice in ['남학교', '여학교'] and final_subject_choice == '아니오':
+            groupby_cols = [] # 전체 그룹 대상이지만 남학교/여학교로 성별은 이미 하나임
+        else:
+            groupby_cols = []
+        selected_row = df[df['merge_key'] == selected_student].iloc[0]
+        if groupby_cols:
+            # 선택한 학생이 속한 그룹 키
+            group_keys = tuple(selected_row[col] for col in groupby_cols)
+            # 전체 그룹
+            all_group_df = df.groupby(groupby_cols)
+            # 같은 그룹 키를 가진 학생들만 필터링
+            candidate_groups_df = all_group_df.get_group(group_keys)
+            # 선택한 학생이 속한 그룹 제외
+            exception_candidate_groups = candidate_groups_df.loc[candidate_groups_df['초기그룹'] != selected_row['초기그룹'], '초기그룹'].unique().tolist()
+            exception_candidate_groups = [int(g_n) for g_n in exception_candidate_groups]
+        else:
+            exception_candidate_groups = df.loc[df['초기그룹'] != selected_row['초기그룹'], '초기그룹'].unique().tolist()
+            exception_candidate_groups = [int(g_n) for g_n in exception_candidate_groups]
+        current_group = int(df.loc[df['merge_key'] == selected_student, '초기그룹'].values[0]) # 출발 그룹 번호
+        target_group = st.selectbox("이동할 대상 그룹 선택", sorted(exception_candidate_groups)) # 도착할 그룹 선택 -> 도착 그룹 번호
 
     st.divider()
     st.markdown("#### 학생 교환 시뮬레이션")
-    st.write("선택한 학생과 다른 그룹의 유사한 학생을 교환하여 평균 및 분포 변화를 비교합니다.")
+    st.write("선택한 학생과 다른 그룹의 유사한 학생을 교환하여 평균 및 분포를 보완합니다.")
     # 유사도 판단용 변수
     selected_discrete_for_swap = st.multiselect("교환 유사도 판단용 이산형 변수 선택", discrete_vars)
     selected_continuous_for_swap = st.selectbox("교환 유사도 판단용 연속형 변수 선택", continuous_vars)
+    st.session_state['move_swap_flag'] = False
     if st.button("교환 시뮬레이션 실행"):
         # 선택한 그룹에서 유사한 학생 탐색
+        ## 선택한 그룹 전체
         target_df = df[df['초기그룹'] == target_group].copy()
-        
         ## 선택한 학생의 이산형 정보와 동일한 학생 필터링
-        filter_df = pd.DataFrame([selected_row[selected_discrete_for_swap].to_dict()])
-        filtered_df = target_df.merge(filter_df, on=selected_discrete_for_swap, how='inner')
+        filter_df = pd.DataFrame([selected_row[selected_discrete_for_swap].to_dict()]) # 필터링용 데이터프레임 생성
+        filtered_df = target_df.merge(filter_df, on=selected_discrete_for_swap, how='inner') # 필터링용 데이터프레임과 선택한 그룹 전체와 이너 조인으로 이산형 필터링
         
         if filtered_df.empty:
             st.warning("교환할 유사한 학생이 없습니다.")
         else:
-            # 연속형 변수 기준으로 가장 가까운 학생 탐색
-            selected_value = selected_row[selected_continuous_for_swap]
-            filtered_df['차이'] = (filtered_df[selected_continuous_for_swap] - selected_value).abs()
-            swap_candidate = filtered_df.nsmallest(1, '차이').iloc[0]
+            # 연속형 변수 기준으로 교환했을 때 이상적인 평균에 가장 근접한 학생 선택
+            ideal_continuous_mean = df[selected_continuous_for_swap].mean()
+            opt_sim_pair_continuous_diffs = {}
+            for idx, row in filtered_df.iterrows():
+                # 선택한 학생과 교환 시뮬레이션
+                opt_sim_df = df.copy(deep=True) # 원본 데이터프레임 복사
+                # 최적의 교환 상대를 구하기 위해 가상의 교환 수행
+                opt_sim_df.loc[opt_sim_df['merge_key'] == selected_student, '초기그룹'] = row['초기그룹'] # 선택한 학생을 대상 그룹으로 이동
+                opt_sim_df.loc[opt_sim_df['merge_key'] == row['merge_key'], '초기그룹'] = current_group # 대상 그룹 중 한 학생을 선택한 학생의 그룹으로 이동
+                new_mean = abs(ideal_continuous_mean - opt_sim_df.loc[opt_sim_df['초기그룹']==current_group, selected_continuous_for_swap].mean())+abs(ideal_continuous_mean - opt_sim_df.loc[opt_sim_df['초기그룹']==target_group, selected_continuous_for_swap].mean())
+                opt_sim_pair_continuous_diffs[(selected_student, row['merge_key'])] = new_mean
+            # new_mean 기준으로 최소값 선택
+            best_pair = min(opt_sim_pair_continuous_diffs, key=lambda x: opt_sim_pair_continuous_diffs[x])
+            best_cost = opt_sim_pair_continuous_diffs[best_pair]
+            swap_candidate_row = filtered_df[filtered_df['merge_key'] == best_pair[1]].iloc[0] # best_pair[1]이 교환 대상 학생
             
             st.markdown("#### 👥 교환 대상 학생 정보")
             st.dataframe(selected_row.to_frame().T, use_container_width=True)
-            st.dataframe(swap_candidate.to_frame().T, use_container_width=True)
-            st.info(f"유사한 학생 탐색 완료: **{swap_candidate['merge_key']}**, "
-                    f"이산형 = {swap_candidate[selected_discrete_for_swap].to_dict()}, "
+            st.dataframe(swap_candidate_row.to_frame().T, use_container_width=True)
+            st.info(f"유사한 학생 탐색 완료: **{swap_candidate_row['merge_key']}**, "
+                    f"이산형 = {swap_candidate_row[selected_discrete_for_swap].to_dict()}, "
                     f"연속형 = {selected_continuous_for_swap}")
             
-            # 교환 수행
+            # 교환을 적용할지 말지 결정하기 위해 시뮬레이션
             sim_df = df.copy(deep=True)
-            sim_df.loc[sim_df['merge_key'] == selected_student, '초기그룹'] = swap_candidate['초기그룹']
-            sim_df.loc[sim_df['merge_key'] == swap_candidate['merge_key'], '초기그룹'] = current_group
+            sim_df.loc[sim_df['merge_key'] == selected_student, '초기그룹'] = swap_candidate_row['초기그룹']
+            sim_df.loc[sim_df['merge_key'] == swap_candidate_row['merge_key'], '초기그룹'] = current_group
+            st.session_state['sim_df'] = sim_df # 시뮬레이션 데이터프레임 세션에 저장
 
             # (1) 교환 전후 연속형 평균 비교
             before_mean = (
@@ -1993,9 +2057,10 @@ with tabs[6]:
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("✅ 교환 변경 적용"):
-                    st.session_state['final_group_assign_df'] = sim_df
-                    sim_df.to_excel('final_group_assign_df_수동교환적용.xlsx', index=False)
-                    st.success(f"학생 {selected_student} ↔ {swap_candidate['merge_key']} 교환이 적용되었습니다.")
+                    st.session_state['final_group_assign_df'] = st.session_state['sim_df']
+                    st.session_state['final_group_assign_df'].to_excel('final_group_assign_df_수동교환적용.xlsx', index=False)
+                    print('교환 적용된 데이터프레임 저장 완료')
+                    st.success(f"학생 {selected_student} ↔ {swap_candidate_row['merge_key']} 교환이 적용되었습니다.")
 
             with col2:
                 if st.button("↩️ 교환 변경 취소"):
@@ -2034,5 +2099,5 @@ with tabs[7]:
     st.success("최종 그룹 배정 결과가 엑셀 파일로 저장되었습니다.")
 
 
-# streamlit run c:/Users/USER/group_classification/pipeline_v6.py
-# streamlit run /Users/mac/insight_/group_classification/pipeline_v6.py
+# streamlit run c:/Users/USER/group_classification/pipeline_v5.py
+# streamlit run /Users/mac/insight_/group_classification/pipeline_v5.py

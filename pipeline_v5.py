@@ -1886,44 +1886,46 @@ with tabs[6]:
     # 유사도 판단용 변수
     selected_discrete_for_swap = st.multiselect("교환 유사도 판단용 이산형 변수 선택", discrete_vars)
     selected_continuous_for_swap = st.selectbox("교환 유사도 판단용 연속형 변수 선택", continuous_vars)
+    st.session_state['move_swap_flag'] = False
     if st.button("교환 시뮬레이션 실행"):
         # 선택한 그룹에서 유사한 학생 탐색
+        ## 선택한 그룹 전체
         target_df = df[df['초기그룹'] == target_group].copy()
         ## 선택한 학생의 이산형 정보와 동일한 학생 필터링
-        filter_df = pd.DataFrame([selected_row[selected_discrete_for_swap].to_dict()])
-        filtered_df = target_df.merge(filter_df, on=selected_discrete_for_swap, how='inner')
+        filter_df = pd.DataFrame([selected_row[selected_discrete_for_swap].to_dict()]) # 필터링용 데이터프레임 생성
+        filtered_df = target_df.merge(filter_df, on=selected_discrete_for_swap, how='inner') # 필터링용 데이터프레임과 선택한 그룹 전체와 이너 조인으로 이산형 필터링
         
         if filtered_df.empty:
             st.warning("교환할 유사한 학생이 없습니다.")
         else:
             # 연속형 변수 기준으로 교환했을 때 이상적인 평균에 가장 근접한 학생 선택
             ideal_continuous_mean = df[selected_continuous_for_swap].mean()
-            sim_pair_diffs = []
+            opt_sim_pair_continuous_diffs = {}
             for idx, row in filtered_df.iterrows():
-                sim_df = df.copy(deep=True)
-                sim_df.loc[sim_df['merge_key'] == selected_student, '초기그룹'] = row['초기그룹']
-                sim_df.loc[sim_df['merge_key'] == row['merge_key'], '초기그룹'] = current_group
-                new_mean = abs(ideal_continuous_mean - sim_df.loc[sim_df['초기그룹']==current_group, selected_continuous_for_swap].mean())+abs(ideal_continuous_mean - sim_df.loc[sim_df['초기그룹']==target_group, selected_continuous_for_swap].mean())
-                sim_pair_diffs.append((row['merge_key'], new_mean))
+                # 선택한 학생과 교환 시뮬레이션
+                opt_sim_df = df.copy(deep=True) # 원본 데이터프레임 복사
+                # 최적의 교환 상대를 구하기 위해 가상의 교환 수행
+                opt_sim_df.loc[opt_sim_df['merge_key'] == selected_student, '초기그룹'] = row['초기그룹'] # 선택한 학생을 대상 그룹으로 이동
+                opt_sim_df.loc[opt_sim_df['merge_key'] == row['merge_key'], '초기그룹'] = current_group # 대상 그룹 중 한 학생을 선택한 학생의 그룹으로 이동
+                new_mean = abs(ideal_continuous_mean - opt_sim_df.loc[opt_sim_df['초기그룹']==current_group, selected_continuous_for_swap].mean())+abs(ideal_continuous_mean - opt_sim_df.loc[opt_sim_df['초기그룹']==target_group, selected_continuous_for_swap].mean())
+                opt_sim_pair_continuous_diffs[(selected_student, row['merge_key'])] = new_mean
             # new_mean 기준으로 최소값 선택
-            sim_pair_diffs.sort(key=lambda x: x[1])
-            best_swap_key = sim_pair_diffs[0][0]
-            swap_candidate = filtered_df[filtered_df['merge_key'] == best_swap_key].iloc[0]
-            selected_value = selected_row[selected_continuous_for_swap]
-            filtered_df['차이'] = (filtered_df[selected_continuous_for_swap] - selected_value).abs()
-            swap_candidate = filtered_df.nsmallest(1, '차이').iloc[0]
+            best_pair = min(opt_sim_pair_continuous_diffs, key=lambda x: opt_sim_pair_continuous_diffs[x])
+            best_cost = opt_sim_pair_continuous_diffs[best_pair]
+            swap_candidate_row = filtered_df[filtered_df['merge_key'] == best_pair[1]].iloc[0] # best_pair[1]이 교환 대상 학생
             
             st.markdown("#### 👥 교환 대상 학생 정보")
             st.dataframe(selected_row.to_frame().T, use_container_width=True)
-            st.dataframe(swap_candidate.to_frame().T, use_container_width=True)
-            st.info(f"유사한 학생 탐색 완료: **{swap_candidate['merge_key']}**, "
-                    f"이산형 = {swap_candidate[selected_discrete_for_swap].to_dict()}, "
+            st.dataframe(swap_candidate_row.to_frame().T, use_container_width=True)
+            st.info(f"유사한 학생 탐색 완료: **{swap_candidate_row['merge_key']}**, "
+                    f"이산형 = {swap_candidate_row[selected_discrete_for_swap].to_dict()}, "
                     f"연속형 = {selected_continuous_for_swap}")
             
-            # 교환 수행
+            # 교환을 적용할지 말지 결정하기 위해 시뮬레이션
             sim_df = df.copy(deep=True)
-            sim_df.loc[sim_df['merge_key'] == selected_student, '초기그룹'] = swap_candidate['초기그룹']
-            sim_df.loc[sim_df['merge_key'] == swap_candidate['merge_key'], '초기그룹'] = current_group
+            sim_df.loc[sim_df['merge_key'] == selected_student, '초기그룹'] = swap_candidate_row['초기그룹']
+            sim_df.loc[sim_df['merge_key'] == swap_candidate_row['merge_key'], '초기그룹'] = current_group
+            st.session_state['sim_df'] = sim_df # 시뮬레이션 데이터프레임 세션에 저장
 
             # (1) 교환 전후 연속형 평균 비교
             before_mean = (
@@ -2010,9 +2012,10 @@ with tabs[6]:
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("✅ 교환 변경 적용"):
-                    st.session_state['final_group_assign_df'] = sim_df
-                    sim_df.to_excel('final_group_assign_df_수동교환적용.xlsx', index=False)
-                    st.success(f"학생 {selected_student} ↔ {swap_candidate['merge_key']} 교환이 적용되었습니다.")
+                    st.session_state['final_group_assign_df'] = st.session_state['sim_df']
+                    st.session_state['final_group_assign_df'].to_excel('final_group_assign_df_수동교환적용.xlsx', index=False)
+                    print('교환 적용된 데이터프레임 저장 완료')
+                    st.success(f"학생 {selected_student} ↔ {swap_candidate_row['merge_key']} 교환이 적용되었습니다.")
 
             with col2:
                 if st.button("↩️ 교환 변경 취소"):
