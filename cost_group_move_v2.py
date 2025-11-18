@@ -1009,8 +1009,8 @@ def cost_group_move_v2(max_iter, tolerance, w_discrete, w_continuous, init_group
                 best_cost = pair_costs[best_pair]
                 print("최고 효율 쌍:", best_pair)
                 print("비용:", best_cost)
-                with open("pair_cost_log.txt", "a", encoding="utf-8") as f:
-                    print(f"==========반복 : {iter_num} 최고 효율 {best_pair} 총 비용: {best_cost}", file=f)
+                # with open("pair_cost_log.txt", "a", encoding="utf-8") as f:
+                #     print(f"==========반복 : {iter_num} 최고 효율 {best_pair} 총 비용: {best_cost}", file=f)
                 idx_s, idx_t = best_pair
                 # 실제 이동 전 기록 저장
                 # move_key = (s_idx, init_grouped_df.loc[idx_s, '초기그룹'], t_idx, init_grouped_df.loc[idx_t, '초기그룹'])
