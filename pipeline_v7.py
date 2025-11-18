@@ -4,7 +4,7 @@ import numpy as np # xlsxwriter 설치 필요 (다른 환경에서)
 import traceback
 import io
 
-st.set_page_config(page_title="그룹 분류 파이프라인", layout="wide")
+st.set_page_config(page_title="반 편성", layout="wide")
 # 사이드바 메뉴
 st.sidebar.title("업로드 및 설정")
 st.sidebar.header("1. 기존 반편성 검사 선택")
@@ -2084,102 +2084,109 @@ with tabs[7]:
     ## 운동부 마지막 번호 부여
 
     # 엑셀 파일로 저장
-    if st.button("💾 최종 그룹 배정 결과 엑셀 파일로 저장"):
-        output_filename = '최종_그룹_배정_결과.xlsx'
-        # final_df.to_excel(output_filename, index=False) # 디버깅용
-        # 1. 기존반번호순 시트
-        df_1 = final_df.sort_values(by=['학년반번호']).copy()
-        # df_1.to_excel('디버깅용_기존반번호순.xlsx', index=False) # 디버깅용
-        # 2. 신규반번호순 시트
-        processing_df = df_1.copy()
-        if '운동부' not in processing_df.columns:
-            processing_df['운동부'] = 0
-        if '전출학생' not in processing_df.columns:
-            processing_df['전출학생'] = 0
-        processing_df['번호분류코드'] = np.where(processing_df['전출학생'] == 1, 2, np.where(processing_df['운동부'] == 1, 1, 0))
-        processing_df = processing_df.sort_values(by=['초기그룹', '번호분류코드', '이름_명렬표'])
-        processing_df['번호'] = processing_df.groupby('초기그룹').cumcount() + 1
-        df_2 = processing_df.sort_values(by=['초기그룹', '번호']).copy()
-        # df_2.to_excel('디버깅용_신규반번호순.xlsx', index=False) # 디버깅용
-        # 3. neis양식 시트
-        processing_df = df_2.copy()
-        ## neis양식 컬럼명 및 순서 맞추기
-        df_3 = pd.DataFrame()
-        df_3['학번'] = processing_df['학년반번호']
-        df_3['수험번호'] = None
-        df_3['성명'] = processing_df['이름_명렬표']
-        df_3['주민등록번호'] = None
-        df_3['진급반코드'] = processing_df['초기그룹']
-        df_3['진급반번호'] = processing_df['번호']
-        df_3['성별'] = processing_df['성별_명렬표'].map({'1':'남성', '2':'여성'})
-        df_3['생년월일'] = None
-        df_3 = df_3[['학번', '수험번호', '성명', '주민등록번호', '진급반코드', '진급반번호', '성별', '생년월일']]
-        # 4. 반별로 나눈 시트 + 번호순으로 정렬
-        df_grouped_dict = {}
-        for group_no, group_df in df_2.groupby('초기그룹'):
-            group_df_sorted = group_df.sort_values(by=['번호']).copy()
-            df_grouped_dict[f'{group_no}반'] = group_df_sorted
-        # 앞서 모든 df 전처리 (df_1, df_2, df_grouped_dict)에서 불필요한 컬럼 제거
-        # df_1 처리
-        rename_map_1 = {}
-        drop_cols_1 = set()
-        for col in df_1.columns:
+    output_filename = '최종_반_배정_결과.xlsx'
+    # final_df.to_excel(output_filename, index=False) # 디버깅용
+    # 1. 기존반번호순 시트
+    df_1 = final_df.sort_values(by=['학년반번호']).copy()
+    # df_1.to_excel('디버깅용_기존반번호순.xlsx', index=False) # 디버깅용
+    # 2. 신규반번호순 시트
+    processing_df = df_1.copy()
+    if '운동부' not in processing_df.columns:
+        processing_df['운동부'] = 0
+    if '전출학생' not in processing_df.columns:
+        processing_df['전출학생'] = 0
+    processing_df['번호분류코드'] = np.where(processing_df['전출학생'] == 1, 2, np.where(processing_df['운동부'] == 1, 1, 0))
+    processing_df = processing_df.sort_values(by=['초기그룹', '번호분류코드', '이름_명렬표'])
+    processing_df['번호'] = processing_df.groupby('초기그룹').cumcount() + 1
+    df_2 = processing_df.sort_values(by=['초기그룹', '번호']).copy()
+    # df_2.to_excel('디버깅용_신규반번호순.xlsx', index=False) # 디버깅용
+    # 3. neis양식 시트
+    processing_df = df_2.copy()
+    ## neis양식 컬럼명 및 순서 맞추기
+    df_3 = pd.DataFrame()
+    df_3['학번'] = processing_df['학년반번호']
+    df_3['수험번호'] = None
+    df_3['성명'] = processing_df['이름_명렬표']
+    df_3['주민등록번호'] = None
+    df_3['진급반코드'] = processing_df['초기그룹']
+    df_3['진급반번호'] = processing_df['번호']
+    df_3['성별'] = processing_df['성별_명렬표'].map({'1':'남성', '2':'여성'})
+    df_3['생년월일'] = None
+    df_3 = df_3[['학번', '수험번호', '성명', '주민등록번호', '진급반코드', '진급반번호', '성별', '생년월일']]
+    # 4. 반별로 나눈 시트 + 번호순으로 정렬
+    df_grouped_dict = {}
+    for group_no, group_df in df_2.groupby('초기그룹'):
+        group_df_sorted = group_df.sort_values(by=['번호']).copy()
+        df_grouped_dict[f'{group_no}반'] = group_df_sorted
+    # 앞서 모든 df 전처리 (df_1, df_2, df_grouped_dict)에서 불필요한 컬럼 제거
+    # df_1 처리
+    rename_map_1 = {}
+    drop_cols_1 = set()
+    for col in df_1.columns:
+        # 삭제 컬럼들
+        if col in ['학년', '임시반', '임시번호', '성별_명렬표', '이름_명렬표', '특이사항', 'merge_key', '번호분류코드', '그룹고정'] + created_variables: # 완벽 일치
+            drop_cols_1.add(col)
+        elif any(key in col for key in ['생기부', '해석', '상담필요', '_merge', '결시생', '운동부', '전출학생', '동명이인']): # 포함 여부
+            drop_cols_1.add(col)
+        # 이름 변경 컬럼
+        elif col == '성별_검사결과':
+            rename_map_1[col] = '성별'
+        elif col == '이름_검사결과':
+            rename_map_1[col] = '이름'
+        elif '초기그룹' in col:
+            rename_map_1[col] = '번호'
+    df_1 = df_1.rename(columns=rename_map_1).drop(columns=drop_cols_1, errors='ignore')
+    # df_2 처리
+    rename_map_2 = {}
+    drop_cols_2 = set()
+    for col in df_2.columns:
+        # 삭제 컬럼들
+        if col in ['학년', '임시반', '임시번호', '성별_명렬표', '이름_명렬표', '특이사항', 'merge_key', '번호분류코드', '그룹고정'] + created_variables: # 완벽 일치
+            drop_cols_2.add(col)
+        elif any(key in col for key in ['생기부', '해석', '상담필요', '_merge', '결시생', '운동부', '전출학생', '동명이인']): # 포함 여부
+            drop_cols_2.add(col)
+        # 이름 변경 컬럼
+        elif col == '성별_검사결과':
+            rename_map_2[col] = '성별'
+        elif col == '이름_검사결과':
+            rename_map_2[col] = '이름'
+        elif '초기그룹' in col:
+            rename_map_2[col] = '신규반'
+    df_2 = df_2.rename(columns=rename_map_2).drop(columns=drop_cols_2, errors='ignore')
+    # df_grouped_dict 처리
+    rename_map = {}
+    drop_cols = set() # 중복 방지
+    for df in df_grouped_dict.values():
+        for col in df.columns:
             # 삭제 컬럼들
             if col in ['학년', '임시반', '임시번호', '성별_명렬표', '이름_명렬표', '특이사항', 'merge_key', '번호분류코드', '그룹고정'] + created_variables: # 완벽 일치
-                drop_cols_1.add(col)
-            elif any(key in col for key in ['생기부', '해석', '상담필요', '_merge', '결시생', '운동부', '전출학생', '동명이인']): # 포함 여부
-                drop_cols_1.add(col)
+                drop_cols.add(col)
+            elif any(key in col for key in ['생기부', '해석', '상담필요', '_merge', '결시생', '운동부', '전출학생', '동명이인', '선택과목', '출신학교']): # 포함 여부
+                drop_cols.add(col)
             # 이름 변경 컬럼
             elif col == '성별_검사결과':
-                rename_map_1[col] = '성별'
+                rename_map[col] = '성별'
             elif col == '이름_검사결과':
-                rename_map_1[col] = '이름'
+                rename_map[col] = '이름'
             elif '초기그룹' in col:
-                rename_map_1[col] = '번호'
-        df_1 = df_1.rename(columns=rename_map_1).drop(columns=drop_cols_1, errors='ignore')
-        # df_2 처리
-        rename_map_2 = {}
-        drop_cols_2 = set()
-        for col in df_2.columns:
-            # 삭제 컬럼들
-            if col in ['학년', '임시반', '임시번호', '성별_명렬표', '이름_명렬표', '특이사항', 'merge_key', '번호분류코드', '그룹고정'] + created_variables: # 완벽 일치
-                drop_cols_2.add(col)
-            elif any(key in col for key in ['생기부', '해석', '상담필요', '_merge', '결시생', '운동부', '전출학생', '동명이인']): # 포함 여부
-                drop_cols_2.add(col)
-            # 이름 변경 컬럼
-            elif col == '성별_검사결과':
-                rename_map_2[col] = '성별'
-            elif col == '이름_검사결과':
-                rename_map_2[col] = '이름'
-            elif '초기그룹' in col:
-                rename_map_2[col] = '신규반'
-        df_2 = df_2.rename(columns=rename_map_2).drop(columns=drop_cols_2, errors='ignore')
-        # df_grouped_dict 처리
-        rename_map = {}
-        drop_cols = set() # 중복 방지
-        for df in df_grouped_dict.values():
-            for col in df.columns:
-                # 삭제 컬럼들
-                if col in ['학년', '임시반', '임시번호', '성별_명렬표', '이름_명렬표', '특이사항', 'merge_key', '번호분류코드', '그룹고정'] + created_variables: # 완벽 일치
-                    drop_cols.add(col)
-                elif any(key in col for key in ['생기부', '해석', '상담필요', '_merge', '결시생', '운동부', '전출학생', '동명이인', '선택과목', '출신학교']): # 포함 여부
-                    drop_cols.add(col)
-                # 이름 변경 컬럼
-                elif col == '성별_검사결과':
-                    rename_map[col] = '성별'
-                elif col == '이름_검사결과':
-                    rename_map[col] = '이름'
-                elif '초기그룹' in col:
-                    rename_map[col] = '신규반'
-        for key in df_grouped_dict.keys():
-            df_grouped_dict[key] = df_grouped_dict[key].rename(columns=rename_map).drop(columns=drop_cols, errors='ignore')
-        # 앞서 모든 시트를 하나의 엑셀 파일로 저장
-        with pd.ExcelWriter(output_filename, engine='openpyxl') as writer:
-            df_1.to_excel(writer, sheet_name='기존반번호순', index=False)
-            df_2.to_excel(writer, sheet_name='신규반번호순', index=False)
-            df_3.to_excel(writer, sheet_name='neis양식', index=False)
-            for sheet_name, group_df in df_grouped_dict.items():
-                group_df.to_excel(writer, sheet_name=sheet_name, index=False)
+                rename_map[col] = '신규반'
+    for key in df_grouped_dict.keys():
+        df_grouped_dict[key] = df_grouped_dict[key].rename(columns=rename_map).drop(columns=drop_cols, errors='ignore')
+    buffer = io.BytesIO()
+    # 앞서 모든 시트를 하나의 엑셀 파일로 저장
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        df_1.to_excel(writer, sheet_name='기존반번호순', index=False)
+        df_2.to_excel(writer, sheet_name='신규반번호순', index=False)
+        df_3.to_excel(writer, sheet_name='neis양식', index=False)
+        for sheet_name, group_df in df_grouped_dict.items():
+            group_df.to_excel(writer, sheet_name=sheet_name, index=False)
+    buffer.seek(0)
+    st.download_button(
+        label="💾 최종 반 배정 엑셀 저장",
+        data=buffer,
+        file_name=output_filename,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 
 # streamlit run c:/Users/USER/group_classification/pipeline_v7.py
