@@ -2175,11 +2175,11 @@ with tabs[7]:
             df_grouped_dict[key] = df_grouped_dict[key].rename(columns=rename_map).drop(columns=drop_cols, errors='ignore')
         # 앞서 모든 시트를 하나의 엑셀 파일로 저장
         with pd.ExcelWriter(output_filename, engine='openpyxl') as writer:
-            #df_1.to_excel(writer, sheet_name='기존반번호순', index=False)
-            #df_2.to_excel(writer, sheet_name='신규반번호순', index=False)
-            #df_3.to_excel(writer, sheet_name='neis양식', index=False)
+            df_1.to_excel(writer, sheet_name='기존반번호순', index=False)
+            df_2.to_excel(writer, sheet_name='신규반번호순', index=False)
+            df_3.to_excel(writer, sheet_name='neis양식', index=False)
             for sheet_name, group_df in df_grouped_dict.items():
-                #group_df.to_excel(writer, sheet_name=sheet_name, index=False)
+                group_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
 
 # streamlit run c:/Users/USER/group_classification/pipeline_v6.py
