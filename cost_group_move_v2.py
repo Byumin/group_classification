@@ -456,7 +456,7 @@ def compute_discrete_cost(group_diff_cost, s_row, t_g, selected_discrete_variabl
         raise e
     return discrete_cost_change
 
-def compute_size_cost(init_grouped_df, s_row, t_row):
+def compute_size_cost(init_grouped_df, s_row, t_g):
     """
     이동 전후 그룹 크기 균형 개선 정도를 계산하는 함수
 
@@ -479,7 +479,7 @@ def compute_size_cost(init_grouped_df, s_row, t_row):
     group_mean_size = group_sizes.mean()
 
     source_group = s_row['초기그룹']
-    target_group = t_row['초기그룹']
+    target_group = t_g
 
     # 이동 전 불균형도 (절대값 기준)
     before = abs(group_sizes[source_group] - group_mean_size) + abs(group_sizes[target_group] - group_mean_size)
@@ -797,8 +797,7 @@ def cost_group_move_v2(max_iter, tolerance, w_discrete, w_continuous, init_group
             prev_mean_size = init_grouped_df.groupby('초기그룹').size().mean() # 이상적인 그룹 크기
             prev_size_cost = sum([abs(len(init_grouped_df[init_grouped_df['초기그룹'] == g]) - prev_mean_size) for g in init_grouped_df['초기그룹'].unique()]) # 그룹 크기 불균형도 -> 값이 클수록 불균형
             prev_total_cost = prev_diff_cost + 10 * prev_size_cost
-            # 이동 기록
-            move_history = []
+            print(init_grouped_df.groupby('초기그룹')[selected_sort_variable].mean())
 
             for iter_num in range(max_iter):
                 print(f"\n======= Iteration {iter_num+1} =======")
@@ -806,7 +805,6 @@ def cost_group_move_v2(max_iter, tolerance, w_discrete, w_continuous, init_group
                 # 이동 전 연속형 변수 출력
                 print("##############################")
                 print("이동 전 그룹 연속형 변수 평균:")
-                print(init_grouped_df.groupby('초기그룹')[selected_sort_variable].mean())
                 group_sizes = init_grouped_df.groupby('초기그룹').size()
                 print(group_sizes)
                 group_mean_size = group_sizes.mean()
@@ -853,30 +851,31 @@ def cost_group_move_v2(max_iter, tolerance, w_discrete, w_continuous, init_group
                 # 모든 쌍에 대해 비용 계산을 담은 딕셔너리
                 pair_costs = {}
                 for s_idx, s_row in source_group_df.iterrows():
-                    for t_idx, t_row in target_group_df.iterrows():
+                    #for t_idx, t_row in target_group_df.iterrows():
+                    for t_g in match_group_idx:
                         # 여기서 s_row와 t_row를 비교하여 교환 가능성을 탐색
                         #! 그룹 고정된 학생이면 교환 계산에서 생략
-                        if s_row.get('그룹고정', False) or t_row.get('그룹고정', False):
+                        if s_row.get('그룹고정', False):
                             continue
 
                         # 혹시 모르니 그룹이 같으면 생략 조건 설정 
-                        if s_row['초기그룹'] == t_row['초기그룹']:
+                        if s_row['초기그룹'] == t_g:
                             continue
                         #elif len(source_group_df) <= len(target_group_df): # 이동하는 그룹의 수보다 도착 그룹의 수가 더 많거나 같으면 비용계산 X -> 앞에서 적은 그룹은 많은 그룹 이동을 방지하도록 설정했으니 이 조건은 불필요
                         #    continue
                         elif len(source_group_df) == len(target_group_df):
                             print("출발 그룹과 도착 그룹의 학생 수가 동일하여 연속형 변수 비용만 계산")
-                            cont_cost = cont_cost = compute_multi_continuous_cost(init_grouped_df, s_row, t_row, selected_sort_variable) # 연속형 변수 비용 계산 (값이 클수록 개선)
+                            cont_cost = compute_multi_continuous_cost(init_grouped_df, s_row, t_g, selected_sort_variable) # 연속형 변수 비용 계산 (값이 클수록 개선)
                             size_cost = 0
                         else:
                         # 연속형 변수 비용 계산
-                            cont_cost = compute_multi_continuous_cost(init_grouped_df, s_row, t_row, selected_sort_variable) # 연속형 변수 비용 계산 (값이 클수록 개선)
+                            cont_cost = compute_multi_continuous_cost(init_grouped_df, s_row, t_g, selected_sort_variable) # 연속형 변수 비용 계산 (값이 클수록 개선)
                             # size_penalty = abs(group_sizes[s_row['초기그룹']] - group_mean_size) + abs(group_sizes[t_row['초기그룹']] - group_mean_size) # 그룹 크기 패널티 계산 (불균형, 특이한 경우 불균형 해소가 불가할 수 있음)
-                            size_cost = compute_size_cost(init_grouped_df, s_row, t_row) # 그룹 크기 패널티 계산 (값이 클수록 개선)
+                            size_cost = compute_size_cost(init_grouped_df, s_row, t_g) # 그룹 크기 패널티 계산 (값이 클수록 개선)
                         # 총 비용 계산
                         total_cost = w_continuous * cont_cost + 100 * size_cost
-                        print(f"쌍 ({s_idx}, {t_idx}) 연속형 비용: {cont_cost}, 크기 패널티: {size_cost}, 총 비용: {total_cost}")
-                        pair_costs[(s_idx, t_idx)] = total_cost
+                        print(f"쌍 ({s_idx}, 도착그룹{t_g}) 연속형 비용: {cont_cost}, 크기 패널티: {size_cost}, 총 비용: {total_cost}")
+                        pair_costs[(s_idx, t_g)] = total_cost
                 # 최대 비용 쌍 선택
                 best_pair = max(pair_costs, key=lambda x: pair_costs[x])
                 best_cost = pair_costs[best_pair]
@@ -924,8 +923,6 @@ def cost_group_move_v2(max_iter, tolerance, w_discrete, w_continuous, init_group
             ideal_freq = compute_ideal_discrete_freq(init_grouped_df, selected_discrete_variable)
             print("이상적인 이산형 변수 빈도수:")
             print(ideal_freq)
-            # 이동 기록
-            move_history = []
 
             # 이전 총 비용 계산, 연속형, 이산형 모두 반영
             prev_group_mean = init_grouped_df.groupby('초기그룹')[selected_sort_variable].mean()
@@ -985,7 +982,8 @@ def cost_group_move_v2(max_iter, tolerance, w_discrete, w_continuous, init_group
                 # 모든 쌍에 대해 비용 계산을 담은 딕셔너리
                 pair_costs = {}
                 for s_idx, s_row in source_group_df.iterrows():
-                    for t_g, _ in target_group_df_dict.items():
+                    #for t_g, _ in target_group_df_dict.items():
+                    for t_g in match_group_idx:
                         # 여기서 s_row와 t_row를 비교하여 교환 가능성을 탐색
                         #! 그룹 고정된 학생이면 교환 계산에서 생략
                         if s_row.get('그룹고정', False):
@@ -1000,10 +998,10 @@ def cost_group_move_v2(max_iter, tolerance, w_discrete, w_continuous, init_group
                         cont_cost = compute_multi_continuous_cost(init_grouped_df, s_row, t_g, selected_sort_variable) # 연속형 변수 비용 계산 (값이 클수록 개선)
                         # 총 비용 계산
                         total_cost = w_discrete * disc_cost + w_continuous * cont_cost
-
                         pair_costs[(s_idx, t_g)] = total_cost # 이동 시켜야하는 학생 인덱스, 도착 그룹 번호
-                        with open("pair_cost_log.txt", "a", encoding="utf-8") as f:
-                            print(f"반복 : {iter_num} 쌍 ({s_idx}, {t_g}) 이산형 비용: {disc_cost}, 연속형 비용: {cont_cost}, 총 비용: {total_cost}", file=f)
+                        print(f"쌍 ({s_idx}, 도착그룹{t_g}) 연속형 비용: {cont_cost}, 이산형 비용: {disc_cost}, 총 비용: {total_cost}")
+                        # with open("pair_cost_log.txt", "a", encoding="utf-8") as f:
+                        #     print(f"반복 : {iter_num} 쌍 ({s_idx}, {t_g}) 이산형 비용: {disc_cost}, 연속형 비용: {cont_cost}, 총 비용: {total_cost}", file=f)
                 # 최대 비용 쌍 선택
                 best_pair = max(pair_costs, key=lambda x: pair_costs[x])
                 best_cost = pair_costs[best_pair]
