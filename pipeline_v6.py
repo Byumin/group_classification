@@ -1515,8 +1515,8 @@ with tabs[4]:
                 st.info("동명이인 관계가 다른반으로 추가되었습니다.")
 
                 # 관계(relationship_dict) 텍스트 저장
-                with open('relationship_dict.txt', 'w', encoding='utf-8') as f:
-                    f.write(str(st.session_state['relationship_dict']))
+                # with open('relationship_dict.txt', 'w', encoding='utf-8') as f:
+                #     f.write(str(st.session_state['relationship_dict']))
                 # 그룹 재배정 로직 실행
                 selected_discrete_variable = st.session_state.get('selected_discrete_variable', [])
                 selected_discrete_variable = ['성별_명렬표' if var == '성별' else var for var in selected_discrete_variable]
