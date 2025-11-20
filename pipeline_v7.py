@@ -404,8 +404,8 @@ tabs = st.tabs(["🔍 명렬표 & 검사결과 비교", "🧪 변수 생성", "�
 with tabs[0]:
     #st.header("명렬표 & 검사결과 비교")
     if 'student_df' in st.session_state and 'raw_df' in st.session_state:
-        student_df = st.session_state['student_df']
-        raw_df = st.session_state['raw_df']
+        student_df = st.session_state['student_df'].replace('-', pd.NA)
+        raw_df = st.session_state['raw_df'].replace('-', pd.NA)
         st.subheader("학생 명렬표")
         st.dataframe(student_df.head(10), use_container_width=True)
         st.subheader("검사 결과 데이터프레임")
