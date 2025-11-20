@@ -11,7 +11,17 @@ st.sidebar.header("1. 기존 반편성 검사 선택")
 options = ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Type', 'B+C Type', 'A+C Type', 'Compact Type', 'Custom Type']
 existing_type = st.sidebar.selectbox("기존 반편성 타입 검사를 선택하세요", options=options, disabled=False, help="기존 타입 검사를 선택하면 연속형 변수와 범주형 변수가 자동으로 선택됩니다.", key="existing_type_selectbox")
 st.session_state['existing_type'] = existing_type
-
+# 컬럼 타입 변환 강제
+def type_force(df):
+    for col in df.columns:
+        try:
+            if col in ['학년', '임시반', '임시번호', '결시생', '운동부', '특수학생', '전출예정']:
+                df[col] = df[col].fillna(0)
+                df[col] = df[col].astype(int)
+            df[col] = df[col].astype(str)
+        except:
+            raise ValueError(f"명렬표의 '{col}' 열에서 데이터 타입 변환에 실패했습니다. 해당 열의 데이터를 확인해주세요.")
+    return df
 # 다중 컬럼 구조를 지닌 검사가 존재
 # 업로드된 검사 결과가 B타입 또는 Compact 타입인 경우 다중 컬럼 구조 해제
 def flatten_multiindex_columns(cols): # 다중 컬럼 구조 해제 함수
@@ -119,8 +129,8 @@ if existing_type in ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Typ
                 rename_map[col] = '학년반번호'
         if rename_map:
             raw_df_2.rename(columns=rename_map, inplace=True)
-        st.session_state['raw_df_1'] = raw_df_1
-        st.session_state['raw_df_2'] = raw_df_2
+        st.session_state['raw_df_1'] = raw_df_1.replace('-', np.nan)
+        st.session_state['raw_df_2'] = raw_df_2.replace('-', np.nan)
         print(raw_df_2.columns)
         #raw_df_1.to_excel("raw_df_1_test.xlsx", index=False)
         #raw_df_2.to_excel("raw_df_2_test.xlsx", index=False)
@@ -149,12 +159,13 @@ if existing_type in ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Typ
             remaining_cols = [col for col in cols if col not in front_cols]
             raw_df = raw_df[front_cols + remaining_cols]
         raw_df.drop(columns=['_merge'], inplace=True)
-        st.session_state['raw_df'] = raw_df
+        st.session_state['raw_df'] = raw_df.replace('-', np.nan)
         st.session_state['cols'] = raw_df.columns.tolist()
         st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
 
     elif student_file and uploaded_file_1 and not uploaded_file_2: # 검사 결과 파일 1만 업로드된 경우
         student_df = pd.read_excel(student_file)
+        type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df = pd.read_excel(uploaded_file_1)
         if set(b_type_essential_cols) & set(raw_df.columns): # raw_df가 B타입인 경우
@@ -177,6 +188,8 @@ if existing_type in ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Typ
                     rename_map[col] = '학년반번호'
             if rename_map:
                 raw_df.rename(columns=rename_map, inplace=True)
+            # 컬럼 타입 강제
+            raw_df['학년반번호'] = raw_df['학년반번호'].astype(str)
         else:
             pass
         rename_map = {}
@@ -188,7 +201,7 @@ if existing_type in ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Typ
         if rename_map:
             raw_df.rename(columns=rename_map, inplace=True)
         raw_df['merge_key'] = raw_df['학년반번호'].astype(str) + raw_df['성별'].astype(str) + raw_df['이름'].astype(str)
-        st.session_state['raw_df'] = raw_df
+        st.session_state['raw_df'] = raw_df.replace('-', np.nan)
         st.session_state['cols'] = raw_df.columns.tolist()
         st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
     elif student_file and not uploaded_file_1 and uploaded_file_2: # 검사 결과 파일 2만 업로드된 경우
@@ -224,7 +237,7 @@ if existing_type in ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Typ
         if rename_map:
             raw_df.rename(columns=rename_map, inplace=True)
         raw_df['merge_key'] = raw_df['학년반번호'].astype(str) + raw_df['성별'].astype(str) + raw_df['이름'].astype(str)
-        st.session_state['raw_df'] = raw_df
+        st.session_state['raw_df'] = raw_df.replace('-', np.nan)
         st.session_state['cols'] = raw_df.columns.tolist()
         st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
     else:
@@ -249,8 +262,8 @@ elif existing_type == 'Custom Type': # 커스텀 타입 선택 시
         raw_df_2['merge_key'] = raw_df_2['학년반번호'].astype(str) + raw_df_2['성별'].astype(str) + raw_df_2['이름'].astype(str)
         #raw_df_1.to_excel("raw_df_1_test.xlsx", index=False)
         #raw_df_2.to_excel("raw_df_2_test.xlsx", index=False)
-        st.session_state['raw_df_1'] = raw_df_1
-        st.session_state['raw_df_2'] = raw_df_2
+        st.session_state['raw_df_1'] = raw_df_1.replace('-', np.nan)
+        st.session_state['raw_df_2'] = raw_df_2.replace('-', np.nan)
         # 두 검사 결과 데이터프레임 병합
         raw_df = pd.merge(raw_df_1, raw_df_2, on='merge_key', how='outer', indicator=True, suffixes=('_검사1', '_검사2'))
         if raw_df[raw_df['_merge']=='left_only'].shape[0] > 0:
@@ -272,7 +285,7 @@ elif existing_type == 'Custom Type': # 커스텀 타입 선택 시
             remaining_cols = [col for col in cols if col not in front_cols]
             raw_df = raw_df[front_cols + remaining_cols]
         raw_df.drop(columns=['_merge'], inplace=True)
-        st.session_state['raw_df'] = raw_df
+        st.session_state['raw_df'] = raw_df.replace('-', np.nan)
         st.session_state['cols'] = raw_df.columns.tolist()
         st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
     elif student_file and uploaded_file_1 and not uploaded_file_2: # 검사 결과 파일 1만 업로드된 경우
@@ -280,7 +293,7 @@ elif existing_type == 'Custom Type': # 커스텀 타입 선택 시
         st.session_state['student_df'] = student_df
         raw_df = pd.read_excel(uploaded_file_1)
         raw_df['merge_key'] = raw_df['학년반번호'].astype(str) + raw_df['성별'].astype(str) + raw_df['이름'].astype(str)
-        st.session_state['raw_df'] = raw_df
+        st.session_state['raw_df'] = raw_df.replace('-', np.nan)
         st.session_state['cols'] = raw_df.columns.tolist()
         st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
     elif student_file and not uploaded_file_1 and uploaded_file_2: # 검사 결과 파일 2만 업로드된 경우
@@ -288,7 +301,7 @@ elif existing_type == 'Custom Type': # 커스텀 타입 선택 시
         st.session_state['student_df'] = student_df
         raw_df = pd.read_excel(uploaded_file_2)
         raw_df['merge_key'] = raw_df['학년반번호'].astype(str) + raw_df['성별'].astype(str) + raw_df['이름'].astype(str)
-        st.session_state['raw_df'] = raw_df
+        st.session_state['raw_df'] = raw_df.replace('-', np.nan)
         st.session_state['cols'] = raw_df.columns.tolist()
         st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
     else:
@@ -315,7 +328,7 @@ try:
         st.session_state['continuous_variable_default'] = continuous_variable_default
         st.session_state['discrete_variable_default'] = discrete_variable_default
         raw_df['상담필요'] = np.where(raw_df[counseling_col].apply(lambda row : (row == 'V').sum(), axis=1) >= 1, '1', '0')
-        st.session_state['raw_df'] = raw_df
+        st.session_state['raw_df'] = raw_df.replace('-', np.nan)
         st.session_state['cols'] = raw_df.columns.tolist()
     elif existing_type == 'C Type-학습': # 연속형만
         continuous_variable_default = ['LQ지수']
@@ -329,7 +342,7 @@ try:
         st.session_state['continuous_variable_default'] = continuous_variable_default
         st.session_state['discrete_variable_default'] = discrete_variable_default
         raw_df['상담필요'] = np.where(raw_df[counseling_col].apply(lambda row : (row == '높음').sum(), axis=1) >= 1, '1', '0')
-        st.session_state['raw_df'] = raw_df
+        st.session_state['raw_df'] = raw_df.replace('-', np.nan)
         st.session_state['cols'] = raw_df.columns.tolist()
         print('compact type selected되어 기본값이 처리 중입니다.')
     elif existing_type == 'A+B Type': # 연속형 + 이산형
@@ -339,7 +352,7 @@ try:
         st.session_state['continuous_variable_default'] = continuous_variable_default
         st.session_state['discrete_variable_default'] = discrete_variable_default
         raw_df['상담필요'] = np.where(raw_df[counseling_col].apply(lambda row : (row == 'V').sum(), axis=1) >= 1, '1', '0')
-        st.session_state['raw_df'] = raw_df
+        st.session_state['raw_df'] = raw_df.replace('-', np.nan)
         st.session_state['cols'] = raw_df.columns.tolist()
     elif existing_type == 'B+C Type': # 연속형 + 이산형
         continuous_variable_default = ['5요인_외향성', '5요인_신경증', 'LQ지수']
@@ -348,7 +361,7 @@ try:
         st.session_state['continuous_variable_default'] = continuous_variable_default
         st.session_state['discrete_variable_default'] = discrete_variable_default
         raw_df['상담필요'] = np.where(raw_df[counseling_col].apply(lambda row : (row == 'V').sum(), axis=1) >= 1, '1', '0')
-        st.session_state['raw_df'] = raw_df
+        st.session_state['raw_df'] = raw_df.replace('-', np.nan)
         st.session_state['cols'] = raw_df.columns.tolist()
     elif existing_type == 'A+C Type': # 연속형만
         continuous_variable_default = ['종합지수', 'LQ지수']
@@ -404,8 +417,8 @@ tabs = st.tabs(["🔍 명렬표 & 검사결과 비교", "🧪 변수 생성", "�
 with tabs[0]:
     #st.header("명렬표 & 검사결과 비교")
     if 'student_df' in st.session_state and 'raw_df' in st.session_state:
-        student_df = st.session_state['student_df'].replace('-', pd.NA)
-        raw_df = st.session_state['raw_df'].replace('-', pd.NA)
+        student_df = st.session_state['student_df']
+        raw_df = st.session_state['raw_df']
         st.subheader("학생 명렬표")
         st.dataframe(student_df.head(10), use_container_width=True)
         st.subheader("검사 결과 데이터프레임")
