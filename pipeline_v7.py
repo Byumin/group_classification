@@ -405,8 +405,10 @@ try:
     else:
         st.session_state['discrete_variable'] = []
         st.sidebar.warning("변수를 선택해주세요.")
-except:
-    pass
+except Exception as e :
+    print("사이드 변수 선택 오류")
+    print(e)
+    
 
 # =============== 본문 영역 ===============
 st.title("🔧 그룹 분류 파이프라인")
