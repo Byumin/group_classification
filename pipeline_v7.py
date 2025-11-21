@@ -67,6 +67,7 @@ if existing_type in ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Typ
     # 두 검사 결과가 모두 업로드된 경우
     if student_file and uploaded_file_1 and uploaded_file_2:
         student_df = pd.read_excel(student_file)
+        type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df_1 = pd.read_excel(uploaded_file_1)
         raw_df_2 = pd.read_excel(uploaded_file_2)
@@ -206,6 +207,7 @@ if existing_type in ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Typ
         st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
     elif student_file and not uploaded_file_1 and uploaded_file_2: # 검사 결과 파일 2만 업로드된 경우
         student_df = pd.read_excel(student_file)
+        type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df = pd.read_excel(uploaded_file_2)
         if set(b_type_essential_cols) & set(raw_df.columns): # raw_df가 B타입인 경우
@@ -255,6 +257,7 @@ elif existing_type == 'Custom Type': # 커스텀 타입 선택 시
     # 두 검사 결과가 모두 업로드된 경우
     if student_file and uploaded_file_1 and uploaded_file_2:
         student_df = pd.read_excel(student_file)
+        type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df_1 = pd.read_excel(uploaded_file_1)
         raw_df_2 = pd.read_excel(uploaded_file_2)
@@ -290,6 +293,7 @@ elif existing_type == 'Custom Type': # 커스텀 타입 선택 시
         st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
     elif student_file and uploaded_file_1 and not uploaded_file_2: # 검사 결과 파일 1만 업로드된 경우
         student_df = pd.read_excel(student_file)
+        type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df = pd.read_excel(uploaded_file_1)
         raw_df['merge_key'] = raw_df['학년반번호'].astype(str) + raw_df['성별'].astype(str) + raw_df['이름'].astype(str)
@@ -298,6 +302,7 @@ elif existing_type == 'Custom Type': # 커스텀 타입 선택 시
         st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
     elif student_file and not uploaded_file_1 and uploaded_file_2: # 검사 결과 파일 2만 업로드된 경우
         student_df = pd.read_excel(student_file)
+        type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df = pd.read_excel(uploaded_file_2)
         raw_df['merge_key'] = raw_df['학년반번호'].astype(str) + raw_df['성별'].astype(str) + raw_df['이름'].astype(str)
