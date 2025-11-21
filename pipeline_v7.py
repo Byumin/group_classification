@@ -11,8 +11,8 @@ st.sidebar.header("1. 기존 반편성 검사 선택")
 options = ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Type', 'B+C Type', 'A+C Type', 'Compact Type', 'Custom Type']
 existing_type = st.sidebar.selectbox("기존 반편성 타입 검사를 선택하세요", options=options, disabled=False, help="기존 타입 검사를 선택하면 연속형 변수와 범주형 변수가 자동으로 선택됩니다.", key="existing_type_selectbox")
 st.session_state['existing_type'] = existing_type
-# 컬럼 타입 변환 강제
-def type_force(df):
+# 명렬표 업로드 엑셀 컬럼 타입 변환 강제
+def student_file_type_force(df):
     for col in df.columns:
         try:
             if col in ['학년', '임시반', '임시번호', '결시생', '운동부', '특수학생', '전출예정']:
@@ -67,7 +67,7 @@ if existing_type in ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Typ
     # 두 검사 결과가 모두 업로드된 경우
     if student_file and uploaded_file_1 and uploaded_file_2:
         student_df = pd.read_excel(student_file)
-        type_force(student_df)
+        student_file_type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df_1 = pd.read_excel(uploaded_file_1)
         raw_df_2 = pd.read_excel(uploaded_file_2)
@@ -166,7 +166,7 @@ if existing_type in ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Typ
 
     elif student_file and uploaded_file_1 and not uploaded_file_2: # 검사 결과 파일 1만 업로드된 경우
         student_df = pd.read_excel(student_file)
-        type_force(student_df)
+        student_file_type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df = pd.read_excel(uploaded_file_1)
         if set(b_type_essential_cols) & set(raw_df.columns): # raw_df가 B타입인 경우
@@ -207,7 +207,7 @@ if existing_type in ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Typ
         st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
     elif student_file and not uploaded_file_1 and uploaded_file_2: # 검사 결과 파일 2만 업로드된 경우
         student_df = pd.read_excel(student_file)
-        type_force(student_df)
+        student_file_type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df = pd.read_excel(uploaded_file_2)
         if set(b_type_essential_cols) & set(raw_df.columns): # raw_df가 B타입인 경우
@@ -257,7 +257,7 @@ elif existing_type == 'Custom Type': # 커스텀 타입 선택 시
     # 두 검사 결과가 모두 업로드된 경우
     if student_file and uploaded_file_1 and uploaded_file_2:
         student_df = pd.read_excel(student_file)
-        type_force(student_df)
+        student_file_type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df_1 = pd.read_excel(uploaded_file_1)
         raw_df_2 = pd.read_excel(uploaded_file_2)
@@ -293,7 +293,7 @@ elif existing_type == 'Custom Type': # 커스텀 타입 선택 시
         st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
     elif student_file and uploaded_file_1 and not uploaded_file_2: # 검사 결과 파일 1만 업로드된 경우
         student_df = pd.read_excel(student_file)
-        type_force(student_df)
+        student_file_type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df = pd.read_excel(uploaded_file_1)
         raw_df['merge_key'] = raw_df['학년반번호'].astype(str) + raw_df['성별'].astype(str) + raw_df['이름'].astype(str)
@@ -302,7 +302,7 @@ elif existing_type == 'Custom Type': # 커스텀 타입 선택 시
         st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
     elif student_file and not uploaded_file_1 and uploaded_file_2: # 검사 결과 파일 2만 업로드된 경우
         student_df = pd.read_excel(student_file)
-        type_force(student_df)
+        student_file_type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df = pd.read_excel(uploaded_file_2)
         raw_df['merge_key'] = raw_df['학년반번호'].astype(str) + raw_df['성별'].astype(str) + raw_df['이름'].astype(str)
