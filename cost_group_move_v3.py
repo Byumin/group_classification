@@ -275,6 +275,93 @@ def compute_group_diff_and_sign(ideal_freq, group_freq, selected_discrete_variab
         raise e
     return group_diff_cost
 
+def diff_and_sign_array(ideal_freq, group_freq, selected_discrete_variable):
+    """
+    이산형 변수의 ideal 대비 actual 차이(diff)와 방향(sign)을 계산하여
+    3차원 numpy 배열로 반환하는 함수
+
+    Parameters
+    ----------
+    ideal_freq : dict
+        이상적인 빈도 정보 (compute_ideal_discrete_freq()의 결과)
+        예시:
+        {
+            'population': {
+                '성별_명렬표': {1: 17.5, 2: 17.5},
+                '상담 필요': {0: 30.0, 1: 5.0}
+            }
+        }
+
+    group_freq : dict
+        실제 그룹별 범주 빈도 정보 (compute_group_discrete_freq()의 결과)
+        예시:
+        {
+            0: {'성별_명렬표': {1: 10, 2: 8}, '상담 필요': {0: 15, 1: 3}},
+            1: {'성별_명렬표': {1: 12, 2: 6}, '상담 필요': {0: 14, 1: 4}}
+        }
+
+    selected_discrete_variable : list
+        계산 대상 이산형 변수명 리스트
+        예: ['성별_명렬표', '상담 필요']
+
+    Returns
+    -------
+    diff_matrix : np.ndarray, shape (n_groups, n_vars, n_categories)
+      diff_matrix[g, v, c] = 그룹 g, 변수 v, 카테고리 c 의 diff 값
+      diff = ideal_count - actual_count
+
+    sign_matrix : np.ndarray, shape (n_groups, n_vars, n_categories)
+      sign_matrix[g, v, c] = diff의 부호 (+1, 0, -1)
+
+    Notes
+    -----
+    해당 함수는 기존 딕셔너리 구조를 행렬 구조로 바꿔 compute_discrete_cost 계산을 벡터화하기 위해 수정함
+    모든 변수중 가장 많은 카테고리 수에 맞춰 0으로 패딩하여 shape이 동일하도록 구성함
+    - diff = ideal_count - actual_count
+      → 양수(+)면 ideal보다 부족, 음수(–)면 ideal보다 과잉.
+    - sign = np.sign(diff)
+      → +1 = 증가 필요, –1 = 감소 필요, 0 = 이상적.
+    - swap 후보 탐색 시,
+      sign이 반대인 그룹끼리 교환 가능성 탐색에 활용함.
+    """
+    import numpy as np
+    groups = list(group_freq.keys())
+    n_groups = len(groups)
+    vars_list = selected_discrete_variable
+    n_vars = len(vars_list)
+    var_to_idx = {var: idx for idx, var in enumerate(vars_list)} # 예시 {성별: 0, 상담필요: 1}
+    category_to_idx = {}
+    max_categories = 0
+    for var in vars_list:
+        categories = set(ideal_freq['population'][var].keys()) # 예시 var 성별이면 {1,2}, 상담필요면 {0,1}
+        # 각 그룹의 카테고리도 포함 ? -> 전체 카테고리를 이미 포함했는데 꼭 필요한가?
+        for g in groups:
+            categories |= set(group_freq[g][var].keys())
+        ###################################################################
+        categories = sorted(list(categories)) # 리스트 변환하면서 정렬은 꼭 해야하나?
+        category_to_idx[var] = {cat: idx for idx, cat in enumerate(categories)} # 예시 {성별: {1:0, 2:1}, 상담필요: {0:0, 1:1}}
+        if len(categories) > max_categories:
+            max_categories = len(categories) # 가장 많은 카테고리 수 갱신
+    # 행렬 초기화
+    diff_matrix = np.zeros((n_groups, n_vars, max_categories), dtype=float)
+    sign_matrix = np.zeros((n_groups, n_vars, max_categories), dtype=float)
+    # 행렬 채우기
+    try:
+        for g_idx, g in enumerate(groups):
+            for var in vars_list:
+                v_idx = var_to_idx[var]
+                cats = category_to_idx[var]
+                for cat, c_idx in cats.items():
+                    ideal_count = ideal_freq['population'][var].get(cat, 0)
+                    acutual_count = group_freq[g][var].get(cat, 0)
+                    diff = ideal_count - acutual_count
+                    diff_matrix[g_idx, v_idx, c_idx] = diff
+                    sign_matrix[g_idx, v_idx, c_idx] = np.sign(diff)
+    except Exception as e:
+        print("Error during diff_and_sign_array execution:", str(e))
+        raise e
+    return diff_matrix, sign_matrix, var_to_idx, category_to_idx
+
 # 연속형 비용함수 설정
 def compute_continuous_cost(init_grouped_df, s_row, t_g, selected_sort_variable): # selected_sort_variable : 단일 변수(1순위)
     import numpy as np
@@ -308,6 +395,7 @@ def compute_continuous_cost(init_grouped_df, s_row, t_g, selected_sort_variable)
         print("Error during compute_continuous_cost execution:", str(e))
         raise e
     return continuous_cost
+
 # 다변량 연속형 비용함수 설정
 def compute_multi_continuous_cost(init_grouped_df, s_row, t_g, selected_sort_variables):
     """
@@ -369,6 +457,72 @@ def compute_multi_continuous_cost(init_grouped_df, s_row, t_g, selected_sort_var
     except Exception as e:
         print("Error during compute_multi_continuous_cost execution:", str(e))
         raise e
+
+def array_discrete_cost(diff_matrix, student_df, target_group_list, var_to_idx, category_to_idx, selected_discrete_variable):
+    """
+    출발 그룹 학생 x 도착 그룹 조합별 이산형 불균형 비용 행렬을 계산하는 함수
+
+    Parameters
+    ----------
+    diff_matrix : np.ndarray
+        shape = (n_groups, n_vars, n_categories)
+    
+    student_df : pd.DataFrame
+        각 학생의 이산 변수 값과 초기그룹 포함
+        열 예: ['초기그룹', '성별_명렬표', '상담 필요']
+    
+    target_group_list : list
+        학생들이 이동할 수 있는 타깃 그룹 번호 리스트
+    
+    var_to_index : dict
+        변수명 → 행렬 axis1 인덱스
+    
+    category_to_index : dict
+        변수명 → {카테고리: 인덱스} 매핑
+    
+    selected_discrete_variable : list
+        ['성별_명렬표', '상담 필요']
+
+    Returns
+    -------
+    cost_matrix : np.ndarray
+        shape = (n_students, n_target_groups)
+        전체 조합 이산형 비용 행렬
+    """
+    import numpy as np
+    import pandas as pd
+    N = len(student_df)
+    M = len(target_group_list)
+    G, V, C = diff_matrix.shape
+
+    source_groups = student_df['초기그룹'].astype(int).values
+    target_groups = np.array(target_group_list, dtype=int)
+
+    source_diff_sq = np.sum(diff_matrix[source_groups]**2, axis=(1,2))  # shape (N,)
+    target_diff_sq = np.sum(diff_matrix[target_groups]**2, axis=(1,2))  # shape (M,)
+
+    before_matrix = source_diff_sq[:, None] + target_diff_sq[None, :]  # shape (N, M)
+
+    student_var_idx = np.zeros((N, V), dtype=int)
+    for var in selected_discrete_variable:
+        v_idx = var_to_idx[var]
+        cats = category_to_idx[var].values()
+        student_var_idx[:, v_idx] = np.array([category_to_idx[var][cat] for cat in cats])
+    
+    delta = np.zeros((N, M, V, C), dtype=float)
+    for var in selected_discrete_variable:
+        v = var_to_idx[var]
+        c = student_var_idx[:, v]
+        delta[np.arange(N)[:, None], np.arange(M)[None, :], v, c[:, None]] += 1
+        delta[np.arange(N)[:, None], np.arange(M)[None, :], v, c[:, None]] -= 1
+
+    new_src = diff_matrix[source_groups][:, None, :, :] + delta
+    new_tgt = diff_matrix[target_groups][None, :, :, :] - delta
+    after_matrix = np.sum(new_src**2 + new_tgt**2, axis=(2,3))
+
+    discrete_cost_matrix = before_matrix - after_matrix
+    discrete_cost_matrix[discrete_cost_matrix < 0] = -np.inf
+    return discrete_cost_matrix
 
 def compute_discrete_cost(group_diff_cost, s_row, t_g, selected_discrete_variable):
     """
