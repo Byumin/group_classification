@@ -999,7 +999,7 @@ def cost_group_move_v2(max_iter, tolerance, w_discrete, w_continuous, init_group
                         # 총 비용 계산
                         total_cost = w_discrete * disc_cost + w_continuous * cont_cost
                         pair_costs[(s_idx, t_g)] = total_cost # 이동 시켜야하는 학생 인덱스, 도착 그룹 번호
-                        print(f"쌍 ({s_idx}, 도착그룹{t_g}) 연속형 비용: {cont_cost}, 이산형 비용: {disc_cost}, 총 비용: {total_cost}")
+                        #print(f"쌍 ({s_idx}, 도착그룹{t_g}) 연속형 비용: {cont_cost}, 이산형 비용: {disc_cost}, 총 비용: {total_cost}")
                         # with open("pair_cost_log.txt", "a", encoding="utf-8") as f:
                         #     print(f"반복 : {iter_num} 쌍 ({s_idx}, {t_g}) 이산형 비용: {disc_cost}, 연속형 비용: {cont_cost}, 총 비용: {total_cost}", file=f)
                 # 최대 비용 쌍 선택

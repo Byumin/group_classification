@@ -457,19 +457,20 @@ with tabs[0]:
         st.dataframe(pd.merge(student_df, raw_df, on='merge_key', how='outer', indicator=True, suffixes=('_명렬표', '_검사결과')).head(10), use_container_width=True)
         # 명렬표에만 있는 행 표시
         st.subheader("명렬표에만 있는 행")
+        st.warning("결시생이 맞는지 확인해주세요.")
         st.dataframe(student_df[~student_df['merge_key'].isin(raw_df['merge_key'])], use_container_width=True)
         # 검사 결과에만 있는 행 표시
         st.subheader("검사 결과에만 있는 행")
         st.dataframe(raw_df[~raw_df['merge_key'].isin(student_df['merge_key'])], use_container_width=True)
 
-        st.write("병합 예상 결과를 확인 후, 병합을 진행하세요.")
         # 병합 버튼
-        if st.button("병합 진행"):
-            # 무조건 merge_key로 병합
-            merged_df = pd.merge(student_df, raw_df, on='merge_key', how='outer', indicator=True, suffixes=('_명렬표', '_검사결과'))
-            st.session_state['merged_df'] = merged_df
+        if raw_df[~raw_df['merge_key'].isin(student_df['merge_key'])].shape[0] == 0:
+            if st.button("병합 진행"):
+                # 무조건 merge_key로 병합
+                merged_df = pd.merge(student_df, raw_df, on='merge_key', how='outer', indicator=True, suffixes=('_명렬표', '_검사결과'))
+                st.session_state['merged_df'] = merged_df
         else :
-            pass
+            st.error("검사 결과에만 있는 학생이 있습니다. 명렬표와 검사 결과를 다시 확인해주세요.")
         # 병합된 데이터프레임 기반으로 결시생, 동명이인(성+이름 동일) 처리
         # 결시생 수, 표시 / 동명이인 수(성+이름 동일), 표시
         if 'merged_df' in st.session_state:
@@ -482,7 +483,14 @@ with tabs[0]:
             st.dataframe(absent_merged_df, use_container_width=True)
             st.session_state['absent_merged_df'] = absent_merged_df
             # 동명이인 확인
-            dup_names_merged_df = merged_df[merged_df.duplicated('이름_명렬표', keep=False)]
+            st.selectbox("동명이인 기준 선택", options=['성+이름', '이름(오른쪽에서 2글자)'], key='dup_name_key_selectbox')
+            if st.session_state['dup_name_key_selectbox'] == '이름(오른쪽에서 2글자)':
+                temp_merger_df = merged_df.copy()
+                temp_merger_df['이름_2글자'] = merged_df['이름_명렬표'].astype(str).str[-2:]
+                dup_names_merged_df = temp_merger_df[temp_merger_df.duplicated('이름_2글자', keep=False)]
+                dup_names_merged_df.drop(columns=['이름_2글자'], inplace=True)
+            else:
+                dup_names_merged_df = merged_df[merged_df.duplicated('이름_명렬표', keep=False)]
             st.write(f"동명이인 수 : {dup_names_merged_df.shape[0]}명")
             st.dataframe(dup_names_merged_df, use_container_width=True)
             st.session_state['dup_names_merged_df'] = dup_names_merged_df
@@ -493,6 +501,13 @@ with tabs[0]:
                 st.dataframe(special_student_df, use_container_width=True)
             else:
                 st.info("명렬표에 특수학생 정보가 없어 생략됩니다.")
+            # 운동부 확인
+            if '운동부' in merged_df.columns:
+                athletic_student_df = merged_df[merged_df['운동부'] == 1]
+                st.write(f"운동부학생 수 : {athletic_student_df.shape[0]}명")
+                st.dataframe(athletic_student_df, use_container_width=True)
+            else:
+                st.info("명렬표에 운동부학생 정보가 없어 생략됩니다.")
             # 전출예정학생 확인
             if '전출예정' in merged_df.columns:
                 transfer_student_df = merged_df[merged_df['전출예정'] == 1]
@@ -515,7 +530,7 @@ with tabs[0]:
                 st.session_state['absent_merged_df'] = merged_df[merged_df['결시생'] == 1]
                 st.session_state['dup_names_merged_df'] = merged_df[merged_df['동명이인_ID'].notna()]
         else:
-            st.warning("병합을 진행해주세요.")
+            pass
 
 # [1] 변수 생성 탭
 with tabs[1]:
@@ -694,13 +709,13 @@ with tabs[3]:
                 # 남자 집단 갯수
                 male_class_count = st.number_input(
                     "남자 집단의 개수를 입력하세요",
-                    min_value=1, max_value=10, value=1,
+                    min_value=1, max_value=20, value=1,
                     help="남자 집단의 개수를 입력하세요."
                 )
                 # 여자 집단 갯수
                 female_class_count = st.number_input(
                     "여자 집단의 개수를 입력하세요",
-                    min_value=1, max_value=10, value=1,
+                    min_value=1, max_value=20, value=1,
                     help="여자 집단의 개수를 입력하세요."
                 )
                 st.session_state['male_class_count'] = male_class_count
@@ -709,21 +724,21 @@ with tabs[3]:
             elif sex_classification == '합반' and merged_df['성별_명렬표'].nunique() == 2:
                 group_count = st.number_input(
                     "분류할 집단의 개수를 입력하세요",
-                    min_value=2, max_value=10, value=2,
+                    min_value=2, max_value=20, value=2,
                     help="분류할 집단의 개수를 입력하세요."
                 )
                 st.session_state['group_count'] = group_count
             elif sex_classification == '남학교' and merged_df['성별_명렬표'].nunique() == 1:
                 group_count = st.number_input(
                     "분류할 집단의 개수를 입력하세요",
-                    min_value=2, max_value=10, value=2,
+                    min_value=2, max_value=20, value=2,
                     help="분류할 집단의 개수를 입력하세요."
                 )
                 st.session_state['group_count'] = group_count
             elif sex_classification == '여학교' and merged_df['성별_명렬표'].nunique() == 1:
                 group_count = st.number_input(
                     "분류할 집단의 개수를 입력하세요",
-                    min_value=2, max_value=10, value=2,
+                    min_value=2, max_value=20, value=2,
                     help="분류할 집단의 개수를 입력하세요."
                 )
                 st.session_state['group_count'] = group_count
@@ -1021,7 +1036,7 @@ with tabs[3]:
                     sorted_idx, sorted_x, final_bin_value = suitable_bin_value(tuples, st.session_state['group_count'])
                     # 초기 그룹 배정
                     group_assign = init_group_assign_v2(tuples, st.session_state['group_count'])
-                    group_assign = [int(g_n)+1 for g_n in group_assign]
+                    group_assign = [int(g_n)+1 for g_n in group_assign] # 그룹 번호 1부터 시작하도록 조정 -> 행렬화 위해 0부터 시작하는것으로 임시변경
                     st.session_state['group_assign'] = group_assign
                     # group_assign과 merged_df 병합
                     group_assign_df = df.copy(deep=True)
@@ -1251,7 +1266,7 @@ with tabs[3]:
                         groupby_cols = [] # 전체 그룹 대상이지만 남학교/여학교로 성별은 이미 하나임
                     else:
                         groupby_cols = []
-                    # 그룹 단위별 전출학생 배정
+                    # 그룹 단위별 운동부 배정
                     group_assign_df = st.session_state['group_assign_df'] # 그룹고정 열 포함된 데이터프레임
                     athlete_student_df = st.session_state['athlete_student_df']
                     athlete_student_df['그룹고정'] = False
@@ -1270,7 +1285,7 @@ with tabs[3]:
                                 filtered_athlete_student_df = athlete_student_df[condition].copy() # true로 남은 인덱스를 가지고 필터링
                             else:
                                 filtered_athlete_student_df = athlete_student_df.copy()
-                            # 해당 그룹에 맞는 결시생이 없는 경우 건너뛰기
+                            # 해당 그룹에 맞는 운동부가 없는 경우 건너뛰기
                             if filtered_athlete_student_df.empty:
                                 athlete_assign_results.append(sub_group_df) # 운동부가 없는 경우 기존 그룹 데이터프레임 그대로 추가
                                 continue
@@ -1437,7 +1452,7 @@ with tabs[4]:
         if 'relationship_dict' not in st.session_state:
             st.session_state['relationship_dict'] = {}
 
-        # 🔍 1️⃣ 주체 학생 검색 및 선택
+        # 주체 학생 검색 및 선택
         st.markdown("##### ① 관계를 설정할 학생 선택")
         search_main = st.text_input("주체 학생 이름 검색")
         filtered_main = [s for s in all_students if search_main in s] if search_main else all_students
@@ -1449,39 +1464,42 @@ with tabs[4]:
         )
 
         if selected_main:
-            # 🔍 2️⃣ 대상 학생 검색 및 필터링
+            # 대상 학생 검색 및 필터링
             st.markdown(f"##### ② **{selected_main}** 학생과의 관계 설정")
             search_target = st.text_input("대상 학생 이름 검색")
-            target_candidates = [s for s in all_students if s != selected_main]
-            filtered_targets = [s for s in target_candidates if search_target in s] if search_target else target_candidates
+            if search_target != "":
+                target_candidates = [s for s in all_students if s != selected_main]
+                filtered_targets = [s for s in target_candidates if search_target in s] if search_target else target_candidates
 
-            if not filtered_targets:
-                st.warning("검색 결과가 없습니다.")
+                if not filtered_targets:
+                    st.warning("검색 결과가 없습니다.")
+                else:
+                    relations = st.session_state['relationship_dict'].get(selected_main, {})
+
+                    # 대상 학생별 관계 선택
+                    for target in filtered_targets:
+                        prev_value = relations.get(target, 0)
+                        options = {"무관": 0, "같은 반": 1, "다른 반": -1}
+                        reverse_options = {v: k for k, v in options.items()}
+                        try:
+                            init_index = list(options.values()).index(int(prev_value))
+                        except:
+                            init_index = 0  # 기본 "무관"
+                        relation = st.selectbox(
+                            f"{selected_main} ↔ {target}",
+                            options=list(options.keys()),
+                            index=init_index,
+                            key=f"{selected_main}_{target}",
+                        )
+                        relations[target] = options[relation]
+
+                    # 관계 저장 버튼
+                    if st.button(f"💾 {selected_main}의 관계 저장"):
+                        st.session_state['relationship_dict'][selected_main] = relations
+                        print(st.session_state['relationship_dict'])
+                        st.success(f"{selected_main}의 관계가 저장되었습니다.")
             else:
-                relations = st.session_state['relationship_dict'].get(selected_main, {})
-
-                # 대상 학생별 관계 선택
-                for target in filtered_targets:
-                    prev_value = relations.get(target, 0)
-                    options = {"무관": 0, "같은 반": 1, "다른 반": -1}
-                    reverse_options = {v: k for k, v in options.items()}
-                    try:
-                        init_index = list(options.values()).index(int(prev_value))
-                    except:
-                        init_index = 0  # 기본 "무관"
-                    relation = st.selectbox(
-                        f"{selected_main} ↔ {target}",
-                        options=list(options.keys()),
-                        index=init_index,
-                        key=f"{selected_main}_{target}",
-                    )
-                    relations[target] = options[relation]
-
-                # 관계 저장 버튼
-                if st.button(f"💾 {selected_main}의 관계 저장"):
-                    st.session_state['relationship_dict'][selected_main] = relations
-                    print(st.session_state['relationship_dict'])
-                    st.success(f"{selected_main}의 관계가 저장되었습니다.")
+                st.info("대상 학생 이름을 입력하여 검색하세요.")
 
         # 관계 현황 보기
         st.markdown("#### 저장된 관계 요약 및 관리")
@@ -2101,7 +2119,7 @@ with tabs[7]:
     ## 그룹 내 이름 가나다순 번호 부여
     ## 그룹 내 성별로 분류하여 번호 부여
     ## 전출학생 마지막 번호 부여
-    ## 운동부 마지막 번호 부여
+    ## 운동부 마지막 번호 부여 -> 상관없이 번호 부여
 
     # 엑셀 파일로 저장
     output_filename = '최종_반_배정_결과.xlsx'
@@ -2209,5 +2227,5 @@ with tabs[7]:
     )
 
 
-# streamlit run c:/Users/USER/group_classification/pipeline_v7.py
+# streamlit run c:/Users/user/workspace/group_classification/pipeline_v7.py
 # streamlit run /Users/mac/insight_/group_classification/pipeline_v7.py

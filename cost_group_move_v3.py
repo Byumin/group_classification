@@ -275,7 +275,7 @@ def compute_group_diff_and_sign(ideal_freq, group_freq, selected_discrete_variab
         raise e
     return group_diff_cost
 
-def diff_and_sign_array(ideal_freq, group_freq, selected_discrete_variable):
+def array_diff_and_sign(ideal_freq, group_freq, selected_discrete_variable):
     """
     이산형 변수의 ideal 대비 actual 차이(diff)와 방향(sign)을 계산하여
     3차원 numpy 배열로 반환하는 함수
@@ -354,7 +354,7 @@ def diff_and_sign_array(ideal_freq, group_freq, selected_discrete_variable):
                     diff_matrix[g_idx, v_idx, c_idx] = diff
                     sign_matrix[g_idx, v_idx, c_idx] = np.sign(diff)
     except Exception as e:
-        print("Error during diff_and_sign_array execution:", str(e))
+        print("Error during array_diff_and_sign execution:", str(e))
         raise e
     return diff_matrix, sign_matrix, var_to_idx, category_to_idx
 
@@ -453,8 +453,120 @@ def compute_multi_continuous_cost(init_grouped_df, s_row, t_g, selected_sort_var
     except Exception as e:
         print("Error during compute_multi_continuous_cost execution:", str(e))
         raise e
+    
+# 다변량 연속형 비용함수 행렬화
+def array_multi_continuous_cost(init_grouped_df, source_group_df, target_group_list, selected_continuous_variables):
+    """
+    출발 그룹 학생 x 도착 그룹 조합별 연속형 불균형 비용 행렬을 계산하는 함수
 
-def array_discrete_cost(diff_matrix, start_group_df, target_group_list, var_to_idx, category_to_idx, selected_discrete_variable):
+    Parameters
+    ----------
+    init_grouped_df : pd.DataFrame
+        전체 학생 데이터프레임
+    source_group_df : pd.DataFrame
+        출발 그룹 학생 df
+    target_group_list : list
+        타깃 그룹 번호 리스트
+    selected_continuous_variables : list
+        고려할 연속형 변수 이름 리스트 (예: ['학업성취', '리더십', '창의성'])
+
+    Returns
+    -------
+    continuous_cost_matrix : np.ndarray
+        shape = (N_students, M_target_groups)
+    이동으로 인한 전체 연속형 변수 기반 비용 변화량 (값이 클수록 개선)
+    """
+    import numpy as np
+    import pandas as pd
+
+    # -------------------------------------
+    # 0. 기본 정보 준비
+    # -------------------------------------
+    N = len(source_group_df)                     # 출발 그룹 학생 수
+    M = len(target_group_list)                  # 타깃 그룹 수
+    V = len(selected_continuous_variables)      # 변수 수
+
+    if V == 0:
+        return np.zeros((N, M), dtype=float)
+
+    # 출발 그룹 번호
+    source_group_idx = int(source_group_df["초기그룹"].iloc[0])
+
+    # 학생별 연속형 값 (N, V)
+    X = source_group_df[selected_continuous_variables].to_numpy()
+
+    # 전체 평균 (V,)
+    pop_mean = init_grouped_df[selected_continuous_variables].mean().to_numpy()
+
+    # -------------------------------------
+    # 1. 출발 그룹 mean / size
+    # -------------------------------------
+    source_df = init_grouped_df[init_grouped_df["초기그룹"] == source_group_idx]
+    mean_s = source_df[selected_continuous_variables].mean().to_numpy()   # (V,)
+    size_s = len(source_df)
+
+    # -------------------------------------
+    # 2. 타깃 그룹 mean / size
+    # -------------------------------------
+    mean_t_list = []
+    size_t_list = []
+
+    for g in target_group_list:
+        gdf = init_grouped_df[init_grouped_df["초기그룹"] == g]
+
+        mean_t_list.append(gdf[selected_continuous_variables].mean().to_numpy())
+        size_t_list.append(len(gdf))
+
+    mean_t = np.vstack(mean_t_list)           # (M, V)
+    size_t = np.array(size_t_list)            # (M,)
+
+    # -------------------------------------
+    # 3. 이동 전 거리 계산 before_dist
+    # -------------------------------------
+    # (1, M, V) 형태 만들기
+    before = (
+        np.abs(mean_s - pop_mean)[None, None, :] +   # (1,1,V)
+        np.abs(mean_t - pop_mean)[None, :, :]        # (1,M,V)
+    )
+    # (N, M, V)로 확장
+    before = np.repeat(before, N, axis=0)
+
+    # -------------------------------------
+    # 4. 이동 후 그룹 평균 계산
+    # -------------------------------------
+
+    # 4-1) 출발 그룹에서 학생 빠질 때 평균 (N, V)
+    new_mean_s = (mean_s * size_s - X) / (size_s - 1)
+
+    # 4-2) 타깃 그룹에서 학생 추가할 때 평균 (N, M, V)
+    # mean_t: (M,V) → (1,M,V)  
+    # size_t: (M,)  → (1,M,1)
+    # X:      (N,V) → (N,1,V)
+    new_mean_t = (
+        (mean_t * size_t[:, None])[None, :, :] + X[:, None, :]
+    ) / (size_t[:, None] + 1)[None, :, :]
+
+    # -------------------------------------
+    # 5. 이동 후 거리 after_dist (N,M,V)
+    # -------------------------------------
+    after = (
+        np.abs(new_mean_s[:, None, :] - pop_mean) +
+        np.abs(new_mean_t - pop_mean)
+    )
+
+    # -------------------------------------
+    # 6. 개선량 계산
+    # -------------------------------------
+    improvement = before - after          # (N, M, V)
+
+    # -------------------------------------
+    # 7. 변수 평균 → (N, M)
+    # -------------------------------------
+    continuous_cost_matrix = improvement.mean(axis=2)
+
+    return continuous_cost_matrix
+
+def array_discrete_cost(diff_matrix, source_group_df, target_group_list, var_to_idx, category_to_idx, selected_discrete_variable):
     """
     출발 그룹 학생 x 도착 그룹 조합별 이산형 불균형 비용 행렬을 계산하는 함수
 
@@ -463,7 +575,7 @@ def array_discrete_cost(diff_matrix, start_group_df, target_group_list, var_to_i
     diff_matrix : np.ndarray
         shape = (n_groups, n_vars, n_categories)
     
-    start_group_df : pd.DataFrame
+    source_group_df : pd.DataFrame
         출발 그룹 학생들만 포함된 DataFrame
     
     target_group_list : list
@@ -486,70 +598,236 @@ def array_discrete_cost(diff_matrix, start_group_df, target_group_list, var_to_i
     """
     import numpy as np
 
-    N = len(start_group_df) # 출발 그룹 학생 수
+    N = len(source_group_df) # 출발 그룹 학생 수
     M = len(target_group_list) # 도착 가능한 그룹 수
     G, V, C = diff_matrix.shape # 차이행렬 / 그룹, 변수, 카테고리 수
 
-    # ---------------------------
-    # 2) 출발 그룹 index / 도착 그룹 index
-    # ---------------------------
-    source_groups = start_group_df["초기그룹"].astype(int).values # shape (N,) 예시 [0,0,0,0,0]
-    target_groups = np.array(target_group_list, dtype=int) # shape (M,) 예시 [1,2,3]
+    # 출발 그룹 index / 도착 그룹 index
+    source_groups = source_group_df["초기그룹"].astype(int).values # shape (N,) 예시 0반이라면 [0,0,0,0,0]
+    target_groups = np.array(target_group_list, dtype=int) # shape (M,) 예시 1반, 2반, 3반이라면 [1,2,3]
 
-    # ---------------------------
-    # 3) 이동 전(before) 비용 계산
-    # ---------------------------
+    # 이동 전 비용 계산
     source_diff_sq = np.sum(diff_matrix[source_groups]**2, axis=(1, 2))  # shape (N,) / 배열 인덱싱에 대해 arr[[a,b,c]] => arr[a], arr[b], arr[c] 같은 순서로 새로운 축으로 쌓은 배열이 생성
     target_diff_sq = np.sum(diff_matrix[target_groups]**2, axis=(1, 2))  # shape (M,) / 배열 인덱싱에 대해 arr[[a,b,c]] => arr[a], arr[b], arr[c] 같은 순서로 새로운 축으로 쌓은 배열이 생성
 
-    before_matrix = source_diff_sq[:, None] + target_diff_sq[None, :]    # shape (N, M) / 브로드캐스팅
+    before_matrix = source_diff_sq[:, None] + target_diff_sq[None, :]    # shape (N, M) / 브로드캐스팅 -> row: 학생, column: 타깃 그룹, (row, columns) 조합별 이동 전 비용
 
-    # ---------------------------
-    # 4) 학생의 이산 변수 카테고리 index 행렬 생성
-    # ---------------------------
-    student_var_idx = np.zeros((N, V), dtype=int)
+    # 학생의 이산 변수 카테고리 index 행렬 생성
+    # 각 학생이 가진 이산 변수값을 해당 변수의 카테고리 인덱스로 변환하여 행렬안에서 바로 사용할 수 있도록
+    student_var_idx = np.zeros((N, V), dtype=int) # shape (N, V) / 출발 그룹 학생 수 x 변수 수
 
     for var in selected_discrete_variable:
-        v_idx = var_to_idx[var]
+        v_idx = var_to_idx[var] # 예시 var 성별이면, var_to_idx에서 0 반환
         # 학생의 실제 값을 → 카테고리 index로 변환
-        student_var_idx[:, v_idx] = start_group_df[var].map(category_to_idx[var]).values
+        student_var_idx[:, v_idx] = source_group_df[var].map(category_to_idx[var]).values # source_group_df 학생들의 var 값을 카테고리 인덱스로 변환하여 저장
+        # 출력 예시
+        '''
+        category_to_idx = 성별 : {1:0, 2:1}, 상담 필요 : {0:0, 1:1}
+        student_var_idx=
+            [[0, 1], # 학생 0: 성별 카테고리 1->0, 상담 필요 카테고리 1->1
+            [1, 0],  # 학생 1: 성별 카테고리 2->1, 상담 필요 카테고리 0->0
+            [0, 0],  # 학생 2: 성별 카테고리 1->0, 상담 필요 카테고리 0->0
+            [1, 1]]  # 학생 3: 성별 카테고리 2->1, 상담 필요 카테고리 1->1
+        '''
 
-    # ---------------------------
-    # 5) delta_src (source 그룹 diff 변화량)
-    #    delta_tgt (target 그룹 diff 변화량)
-    # ---------------------------
-    delta_src = np.zeros((N, M, V, C), dtype=float)
-    delta_tgt = np.zeros((N, M, V, C), dtype=float)
+    # delta_src (source 그룹 diff 변화량), delta_tgt (target 그룹 diff 변화량)
+    delta_src = np.zeros((N, M, V, C), dtype=float) # shape (N, M, V, C) / 학생 수 x 타깃 그룹 수 x 변수 수 x 카테고리 수
+    delta_tgt = np.zeros((N, M, V, C), dtype=float) # shape (N, M, V, C) / 학생 수 x 타깃 그룹 수 x 변수 수 x 카테고리 수
 
     # (N개 학생 × M개 타깃 그룹) 조합 모두에 대해
     # 해당 학생이 가진 카테고리 위치에 +1 / -1 업데이트
     for var in selected_discrete_variable:
         v = var_to_idx[var]
-        cat_idx = student_var_idx[:, v]             # shape (N,) 예: [0,1,0,1]
-
+        cat_idx = student_var_idx[:, v] # shape (N,) / 각 학생의 해당 변수 카테고리 인덱스
         # source diff는 +1 증가
-        delta_src[np.arange(N)[:, None], np.arange(M)[None, :], v, cat_idx[:, None]] += 1
-
+        delta_src[np.arange(N)[:, None], np.arange(M)[None, :], v, cat_idx[:, None]] += 1 # 해당 학생이 도착 그룹으로 이동 시 diff가 해당 카테고리에서 1 증가
         # target diff는 -1 감소
-        delta_tgt[np.arange(N)[:, None], np.arange(M)[None, :], v, cat_idx[:, None]] -= 1
+        delta_tgt[np.arange(N)[:, None], np.arange(M)[None, :], v, cat_idx[:, None]] -= 1 # 해당 학생이 도착 그룹으로 이동 시 diff가 해당 카테고리에서 1 감소
 
-    # ---------------------------
-    # 6) 이동 후(after) diff 계산
-    # ---------------------------
-    new_src = diff_matrix[source_groups][:, None, :, :] + delta_src   # (N, M, V, C)
-    new_tgt = diff_matrix[target_groups][None, :, :, :] + delta_tgt    # (N, M, V, C)
+    # 이동 후 diff 계산
+    new_src = diff_matrix[source_groups][:, None, :, :] + delta_src # (N, M, V, C) / source_groups는 출발 그룹의 인덱싱과 함께 학생 수 만큼 반복 브로드캐스팅
+    new_tgt = diff_matrix[target_groups][None, :, :, :] + delta_tgt # (N, M, V, C) 
+    after_matrix = np.sum(new_src**2 + new_tgt**2, axis=(2, 3)) # shape (N, M)
 
-    after_matrix = np.sum(new_src**2 + new_tgt**2, axis=(2, 3))        # shape (N, M)
-
-    # ---------------------------
-    # 7) 이동의 효과 = before - after
-    # ---------------------------
+    # 이동의 효과 = before - after
     discrete_cost_matrix = before_matrix - after_matrix
 
     # 이득이 없는 이동(음수)는 모두 불가능 처리
     discrete_cost_matrix[discrete_cost_matrix < 0] = -np.inf
 
     return discrete_cost_matrix
+
+def array_discrete_cost_v3(
+    diff_matrix, 
+    source_group_df, 
+    target_group_list, 
+    var_to_idx, 
+    category_to_idx, 
+    selected_discrete_variable
+):
+    """
+    출발 그룹 학생 × 도착 그룹 조합별 이산형 비용 행렬을 계산
+    (compute_discrete_cost와 100% 동일한 규칙)
+
+    diff_matrix: shape (G, V, C)
+    """
+
+    import numpy as np
+
+    # ---------------------------
+    # 기본 정보
+    # ---------------------------
+    N = len(source_group_df)
+    M = len(target_group_list)
+
+    G, V, C = diff_matrix.shape
+
+    # 출발 그룹 번호 (N명 다 동일)
+    source_group = int(source_group_df["초기그룹"].iloc[0])
+
+    # 도착 그룹 번호 리스트
+    target_groups = np.array(target_group_list, dtype=int)
+
+    # ---------------------------
+    # BEFORE COST (스칼라와 동일)
+    # ---------------------------
+    # source group cost: 하나
+    before_src = np.sum(diff_matrix[source_group] ** 2)  # scalar
+
+    # target group cost: M개
+    before_tgt = np.sum(diff_matrix[target_groups] ** 2, axis=(1, 2))  # shape (M,)
+
+    # 전체 before: (N, M)
+    before_matrix = before_src + before_tgt[None, :]
+
+    # ---------------------------
+    # 학생의 카테고리 index (N, V)
+    # ---------------------------
+    student_var_idx = np.zeros((N, V), dtype=int)
+
+    for var in selected_discrete_variable:
+        v = var_to_idx[var]
+        student_var_idx[:, v] = source_group_df[var].map(category_to_idx[var]).values
+
+    # ---------------------------
+    # delta_src: 출발 그룹 diff 변화량
+    # delta_tgt: 도착 그룹 diff 변화량
+    # ---------------------------
+    # src shape: (N, V, C)  → 학생마다 diff에서 +1
+    delta_src = np.zeros((N, V, C), dtype=float)
+    for var in selected_discrete_variable:
+        v = var_to_idx[var]
+        cat = student_var_idx[:, v]          # shape (N,)
+        delta_src[np.arange(N), v, cat] += 1
+
+    # tgt shape: (N, M, V, C)
+    delta_tgt = np.zeros((N, M, V, C), dtype=float)
+    for var in selected_discrete_variable:
+        v = var_to_idx[var]
+        cat = student_var_idx[:, v]          # shape (N,)
+
+        # 각 학생 N × 각 target M 조합 → 그 변수 v, 해당 cat 위치에서 -1
+        delta_tgt[np.arange(N)[:, None], np.arange(M)[None, :], v, cat[:, None]] -= 1
+
+    # ---------------------------
+    # AFTER COST: 스칼라 방식과 100% 동일
+    # ---------------------------
+
+    # 출발 그룹 diff 변화 후: (N, V, C)
+    new_src_diff = diff_matrix[source_group][None, :, :] + delta_src
+
+    # 도착 그룹 diff 변화 후:  (N, M, V, C)
+    original_tgt_diff = diff_matrix[target_groups]       # shape (M, V, C)
+    new_tgt_diff = original_tgt_diff[None, :, :, :] + delta_tgt
+
+    # 비용 계산
+    # new_src_cost: (N,)
+    new_src_cost = np.sum(new_src_diff ** 2, axis=(1, 2))
+
+    # new_tgt_cost: (N, M)
+    new_tgt_cost = np.sum(new_tgt_diff ** 2, axis=(2, 3))
+
+    # after_matrix shape: (N, M)
+    after_matrix = new_src_cost[:, None] + new_tgt_cost
+
+    # ---------------------------
+    # 개선량 = before - after
+    # ---------------------------
+    improvement = before_matrix - after_matrix
+
+    # 개선이 없는 이동은 차단
+    improvement[improvement < 0] = -np.inf
+
+    return improvement
+
+def array_discrete_cost_v4(diff_matrix, student_df, target_group_list,
+                           var_to_idx, cat_to_idx, selected_discrete_variable):
+    """
+    [정식 정정 버전]
+    각 (학생 i, 타깃 j) 조합에 대해 diff를 직접 갱신하여
+    이동 후 총 비용을 정확하게 계산하는 방식.
+
+    Parameters
+    ----------
+    diff_matrix : np.ndarray
+        shape (G, V, C)
+    student_df : pd.DataFrame
+        출발 그룹의 학생 목록
+    target_group_list : list
+        이동 가능 타깃 그룹 리스트
+    var_to_idx, cat_to_idx : dict
+        변수/카테고리 인덱스 매핑
+    selected_discrete_variable : list
+
+    Returns
+    -------
+    improvement_matrix : np.ndarray
+        shape (N, M)
+        (i,j) 이동에 따른 비용 개선량
+    """
+
+    import numpy as np
+
+    N = len(student_df)         # 학생 수
+    M = len(target_group_list)  # 타깃 그룹 수
+    G = diff_matrix.shape[0]
+
+    # before cost (전체 diff squared sum)
+    before_cost = np.sum(diff_matrix ** 2)
+
+    improvement = np.full((N, M), -np.inf)
+
+    student_groups = student_df['초기그룹'].values
+
+    # 각 학생 i, 타깃 j 조합별로 diff 직접 갱신해 계산
+    for i, (idx, row) in enumerate(student_df.iterrows()):
+        s_g = int(row['초기그룹'])
+        s_v1 = row[selected_discrete_variable[0]]
+        s_v2 = row[selected_discrete_variable[1]]
+
+        for j, t_g in enumerate(target_group_list):
+            t_g = int(t_g)
+            if t_g == s_g:
+                continue
+
+            # diff 복사
+            new_diff = diff_matrix.copy()
+
+            # 출발 그룹 diff 변경 (+1)
+            new_diff[s_g, var_to_idx[selected_discrete_variable[0]], cat_to_idx[selected_discrete_variable[0]][s_v1]] += 1
+            new_diff[s_g, var_to_idx[selected_discrete_variable[1]], cat_to_idx[selected_discrete_variable[1]][s_v2]] += 1
+
+            # 도착 그룹 diff 변경 (−1)
+            new_diff[t_g, var_to_idx[selected_discrete_variable[0]], cat_to_idx[selected_discrete_variable[0]][s_v1]] -= 1
+            new_diff[t_g, var_to_idx[selected_discrete_variable[1]], cat_to_idx[selected_discrete_variable[1]][s_v2]] -= 1
+
+            # 이동 후 비용
+            after_cost = np.sum(new_diff ** 2)
+
+            # 개선량 (before - after)
+            improvement[i, j] = before_cost - after_cost
+
+    return improvement
 
 def compute_discrete_cost(group_diff_cost, s_row, t_g, selected_discrete_variable):
     """
@@ -1410,91 +1688,88 @@ def cost_group_move_v3(max_iter, tolerance, w_discrete, w_continuous, init_group
             print(f"이전 이산형 총 불균형도: {prev_disc_total_cost}")
             print(f"이전 연속형 비용: {prev_diff_cost}, 이전 이산형 비용: {prev_disc_total_cost}")
             print(w_discrete)
-            prev_total_cost = 10 * prev_diff_cost + 10 * prev_disc_total_cost
+            # prev_total_cost = 10 * prev_diff_cost + 10 * prev_disc_total_cost
+            prev_total_cost = 10 * prev_disc_total_cost
             print(f"이전 총 비용: {prev_total_cost}")
 
             for iter_num in range(max_iter):
                 print(f"\n======= Iteration {iter_num+1} =======")
-                # 그룹별 총 불균형도 및 diff, sign 계산
-                group_freq = compute_group_discrete_freq(init_grouped_df, selected_discrete_variable) # 각 그룹별 이산형 실제 빈도
-                group_total_cost, group_total_cost_square = compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable) # 각 그룹별 이산형 총 불균형도
-                group_diff_cost = compute_group_diff_and_sign(ideal_freq, group_freq, selected_discrete_variable) # 각 그룹별 이산형 diff, sign
-                groups = init_grouped_df['초기그룹'].unique()
-
-                # 이동 전 이상현 빈도 출력
-                print("##############################")
-                print("이전 그룹 이상적 빈도:")
-                print(ideal_freq)
-                print("이전 그룹 빈도 분포:")
+                # 1) 현재 그룹 diff 계산
+                print("이상적인 그룹 이산형 빈도수:")
+                print(dict(sorted(ideal_freq.items())))
+                group_freq = compute_group_discrete_freq(init_grouped_df, selected_discrete_variable)
+                print("이동 전 그룹 이산형 빈도수:")
                 print(dict(sorted(group_freq.items())))
+                group_total_cost, _ = compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable)
                 print("그룹별 총 불균형도:")
                 print(dict(sorted(group_total_cost.items())))
-            
-                # 불균형이 가장 큰 그룹 탐색
-                source_group_idx = min(group_total_cost, key=group_total_cost.get) # 이상치보다 많은 그룹에서 이동을 해야함. 그렇기 때문에 해당 값이 음수(이상-실제)일수록 이동 우선순위가 높음
-                print("##############################")
-                print(f"최고 편차 그룹 : {source_group_idx}")
-                print("이산변수 차이 및 부호 값:")
-                print(group_diff_cost[source_group_idx])
 
-                # 타깃 그룹 후보 (출발 그룹을 제외)
-                match_group_idx = [g for g in groups if g != source_group_idx]
+                # 2) 이동 우선 그룹 선택
+                source_group_idx = min(group_total_cost, key=group_total_cost.get)
+
+                print(f"출발 그룹: {source_group_idx}")
+
+                # 3) 출발 학생 목록 가져오기
                 source_group_df = init_grouped_df[init_grouped_df['초기그룹']==source_group_idx]
-                target_group_df = init_grouped_df[init_grouped_df['초기그룹'].isin(match_group_idx)] # match_group_idx : list 형태
-                target_group_df_dict = {g: init_grouped_df[init_grouped_df['초기그룹']==g] for g in match_group_idx}
+                if '그룹고정' in source_group_df.columns:
+                    source_group_df = source_group_df[source_group_df['그룹고정'] != True]
+                student_df = source_group_df.copy()
 
-                # 연속형 변수 비용계산을 위해 추출
-                selected_sort_variable = list(selected_sort_variable_dict.keys()) # selected_sort_variable_dict : 딕셔너리 형태로 입력됨 (오른쪽으로 갈수록 우선순위 높음)
-                # 그룹 고정된 학생 필터링
-                source_group_df = source_group_df.loc[:, '그룹고정'==False].copy()
-                # 행렬화 하기 위해 출발 그룹의 학생 인덱스 배열
-                s_idx = source_group_df.index.values
-                # 타깃 그룹 인덱스 배열
-                t_idx = np.array(match_group_idx)
-                s, t = np.meshgrid(s_idx, t_idx, indexing='ij') # 인덱스 행렬화 / s : 출발 학생 인덱스, t : 도착 그룹 인덱스
-                # 모든 쌍에 대해 비용 계산을 담은 딕셔너리
-                pair_costs = {}
-                for s_idx, s_row in source_group_df.iterrows():
-                    #for t_g, _ in target_group_df_dict.items():
-                    for t_g in match_group_idx:
-                        # 여기서 s_row와 t_row를 비교하여 교환 가능성을 탐색
-                        #! 그룹 고정된 학생이면 교환 계산에서 생략
-                        if s_row.get('그룹고정', False):
-                            continue
-                        
-                        # 혹시 모르니 조건 설정
-                        if s_row['초기그룹'] == t_g:
-                            continue
-                        # 이산형 변수 비용 계산
-                        disc_cost = compute_discrete_cost(group_diff_cost, s_row, t_g, selected_discrete_variable) # 이산형 변수 비용 계산 (값이 클수록 개선)
-                        # 연속형 변수 비용 계산
-                        cont_cost = compute_multi_continuous_cost(init_grouped_df, s_row, t_g, selected_sort_variable) # 연속형 변수 비용 계산 (값이 클수록 개선)
-                        # 총 비용 계산
-                        total_cost = w_discrete * disc_cost + w_continuous * cont_cost
-                        pair_costs[(s_idx, t_g)] = total_cost # 이동 시켜야하는 학생 인덱스, 도착 그룹 번호
-                        print(f"쌍 ({s_idx}, 도착그룹{t_g}) 연속형 비용: {cont_cost}, 이산형 비용: {disc_cost}, 총 비용: {total_cost}")
-                        # with open("pair_cost_log.txt", "a", encoding="utf-8") as f:
-                        #     print(f"반복 : {iter_num} 쌍 ({s_idx}, {t_g}) 이산형 비용: {disc_cost}, 연속형 비용: {cont_cost}, 총 비용: {total_cost}", file=f)
-                # 최대 비용 쌍 선택
-                best_pair = max(pair_costs, key=lambda x: pair_costs[x])
-                best_cost = pair_costs[best_pair]
-                print("최고 효율 쌍:", best_pair)
-                print("비용:", best_cost)
-                # with open("pair_cost_log.txt", "a", encoding="utf-8") as f:
-                #     print(f"==========반복 : {iter_num} 최고 효율 {best_pair} 총 비용: {best_cost}", file=f)
-                idx_s, idx_t = best_pair
-                # 실제 이동 전 기록 저장
-                # move_key = (s_idx, init_grouped_df.loc[idx_s, '초기그룹'], t_idx, init_grouped_df.loc[idx_t, '초기그룹'])
-                # if move_key in move_history:
-                #     print("이미 이동한 쌍이라 중단합니다.")
-                #     break
-                # 실제 그룹 이동
-                print("++이동하는 정보++")
-                print(f"그룹 이동 완료: {init_grouped_df.loc[idx_s, '초기그룹']} -> {idx_t}")
-                print("이동 학생 정보:")
-                print(init_grouped_df.loc[idx_s, selected_discrete_variable])
-                print("+++++++++++++++")
-                init_grouped_df.loc[idx_s, '초기그룹'] = idx_t
+                # 4) 타깃 그룹 리스트
+                groups = init_grouped_df['초기그룹'].unique()
+                target_group_list = [g for g in groups if g != source_group_idx]
+
+                # 5) diff 행렬화
+                diff_matrix, sign_matrix, var_to_idx, cat_to_idx = array_diff_and_sign(
+                    ideal_freq, group_freq, selected_discrete_variable
+                )
+
+                # 6) 이산형 비용 행렬 계산
+                disc_matrix = array_discrete_cost_v4(
+                    diff_matrix,
+                    student_df,
+                    target_group_list,
+                    var_to_idx,
+                    cat_to_idx,
+                    selected_discrete_variable
+                )
+
+                # # 7) 연속형 비용 행렬 계산
+                # cont_matrix = array_multi_continuous_cost(
+                #     init_grouped_df,
+                #     student_df,
+                #     target_group_list,
+                #     selected_sort_variable
+                # )
+
+                # # 8) 총 비용 행렬
+                # total_matrix = w_discrete * disc_matrix + w_continuous * cont_matrix
+                # 8) 총 비용 행렬
+                total_matrix = w_discrete * disc_matrix
+
+                # 이동 불가 조합 배제
+                valid_mask = np.isfinite(total_matrix)
+                if not valid_mask.any():
+                    print("유효한 이동 가능 조합 없음. 종료.")
+                    break
+
+                # 9) 최적 이동 조합 찾기
+                best_idx = np.nanargmax(total_matrix)
+                i, j = np.unravel_index(best_idx, total_matrix.shape)
+
+                # 실제 학생/그룹 id로 변환
+                idx_s = student_df.index[i]
+                idx_t = target_group_list[j]
+
+                print("\n=== 선택된 최적 이동 ===")
+                print("존재하는 모든 그룹 번호")
+                print(init_grouped_df['초기그룹'].unique())
+                print(f"학생 index: {idx_s}")
+                print(student_df.loc[idx_s, selected_discrete_variable])
+                print(f"출발 → 도착: {init_grouped_df.at[idx_s,'초기그룹']} → {idx_t}")
+
+                # 10) 실제 이동 적용
+                init_grouped_df.at[idx_s, '초기그룹'] = idx_t
                 # 이동 기록 업데이트
                 # move_history.append(move_key)
                 # 이동 후 비용 계산
@@ -1512,15 +1787,16 @@ def cost_group_move_v3(max_iter, tolerance, w_discrete, w_continuous, init_group
                 _, new_disc_cost_square = compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable) # 각 그룹별 이산형 총 불균형도
                 #new_disc_cost = {k: abs(v) for k, v in new_disc_cost.items()} # 절대값 변환
                 new_disc_total_cost = sum(new_disc_cost_square.values())
-                new_total_cost = 10 * new_diff_cost + 10 * new_disc_total_cost
+                # new_total_cost = 10 * new_diff_cost + 10 * new_disc_total_cost
+                new_total_cost = 10 * new_disc_total_cost
                 print(f"이전 총 비용: {prev_total_cost}, 새로운 총 비용: {new_total_cost}")
                 # 비용 개선폭 계산
                 improvement = abs(prev_total_cost - new_total_cost)
                 #print(f"비용 개선폭: {improvement:.6f}")
                 # 이동 후 그룹별 평균과 분포 출력
                 group_freq = compute_group_discrete_freq(init_grouped_df, selected_discrete_variable)
-                print("Group Frequency:")
-                print(group_freq)
+                print("이동후 그룹별 이산형 빈도수:")
+                print(dict(sorted(group_freq.items())))
                 if improvement < tolerance:
                     print("개선 폭이 작아 중단합니다.")
                     break
