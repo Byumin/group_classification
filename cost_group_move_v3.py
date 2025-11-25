@@ -334,17 +334,13 @@ def diff_and_sign_array(ideal_freq, group_freq, selected_discrete_variable):
     max_categories = 0
     for var in vars_list:
         categories = set(ideal_freq['population'][var].keys()) # 예시 var 성별이면 {1,2}, 상담필요면 {0,1}
-        # 각 그룹의 카테고리도 포함 ? -> 전체 카테고리를 이미 포함했는데 꼭 필요한가?
-        for g in groups:
-            categories |= set(group_freq[g][var].keys())
-        ###################################################################
-        categories = sorted(list(categories)) # 리스트 변환하면서 정렬은 꼭 해야하나?
+        categories = sorted(list(categories))
         category_to_idx[var] = {cat: idx for idx, cat in enumerate(categories)} # 예시 {성별: {1:0, 2:1}, 상담필요: {0:0, 1:1}}
         if len(categories) > max_categories:
             max_categories = len(categories) # 가장 많은 카테고리 수 갱신
     # 행렬 초기화
-    diff_matrix = np.zeros((n_groups, n_vars, max_categories), dtype=float)
-    sign_matrix = np.zeros((n_groups, n_vars, max_categories), dtype=float)
+    diff_matrix = np.zeros((n_groups, n_vars, max_categories), dtype=float) # 여기서 padding 발생
+    sign_matrix = np.zeros((n_groups, n_vars, max_categories), dtype=float) # 여기서 padding 발생
     # 행렬 채우기
     try:
         for g_idx, g in enumerate(groups):
@@ -458,7 +454,7 @@ def compute_multi_continuous_cost(init_grouped_df, s_row, t_g, selected_sort_var
         print("Error during compute_multi_continuous_cost execution:", str(e))
         raise e
 
-def array_discrete_cost(diff_matrix, student_df, target_group_list, var_to_idx, category_to_idx, selected_discrete_variable):
+def array_discrete_cost(diff_matrix, start_group_df, target_group_list, var_to_idx, category_to_idx, selected_discrete_variable):
     """
     출발 그룹 학생 x 도착 그룹 조합별 이산형 불균형 비용 행렬을 계산하는 함수
 
@@ -467,9 +463,8 @@ def array_discrete_cost(diff_matrix, student_df, target_group_list, var_to_idx, 
     diff_matrix : np.ndarray
         shape = (n_groups, n_vars, n_categories)
     
-    student_df : pd.DataFrame
-        각 학생의 이산 변수 값과 초기그룹 포함
-        열 예: ['초기그룹', '성별_명렬표', '상담 필요']
+    start_group_df : pd.DataFrame
+        출발 그룹 학생들만 포함된 DataFrame
     
     target_group_list : list
         학생들이 이동할 수 있는 타깃 그룹 번호 리스트
@@ -490,38 +485,70 @@ def array_discrete_cost(diff_matrix, student_df, target_group_list, var_to_idx, 
         전체 조합 이산형 비용 행렬
     """
     import numpy as np
-    import pandas as pd
-    N = len(student_df)
-    M = len(target_group_list)
-    G, V, C = diff_matrix.shape
 
-    source_groups = student_df['초기그룹'].astype(int).values
-    target_groups = np.array(target_group_list, dtype=int)
+    N = len(start_group_df) # 출발 그룹 학생 수
+    M = len(target_group_list) # 도착 가능한 그룹 수
+    G, V, C = diff_matrix.shape # 차이행렬 / 그룹, 변수, 카테고리 수
 
-    source_diff_sq = np.sum(diff_matrix[source_groups]**2, axis=(1,2))  # shape (N,)
-    target_diff_sq = np.sum(diff_matrix[target_groups]**2, axis=(1,2))  # shape (M,)
+    # ---------------------------
+    # 2) 출발 그룹 index / 도착 그룹 index
+    # ---------------------------
+    source_groups = start_group_df["초기그룹"].astype(int).values # shape (N,) 예시 [0,0,0,0,0]
+    target_groups = np.array(target_group_list, dtype=int) # shape (M,) 예시 [1,2,3]
 
-    before_matrix = source_diff_sq[:, None] + target_diff_sq[None, :]  # shape (N, M)
+    # ---------------------------
+    # 3) 이동 전(before) 비용 계산
+    # ---------------------------
+    source_diff_sq = np.sum(diff_matrix[source_groups]**2, axis=(1, 2))  # shape (N,) / 배열 인덱싱에 대해 arr[[a,b,c]] => arr[a], arr[b], arr[c] 같은 순서로 새로운 축으로 쌓은 배열이 생성
+    target_diff_sq = np.sum(diff_matrix[target_groups]**2, axis=(1, 2))  # shape (M,) / 배열 인덱싱에 대해 arr[[a,b,c]] => arr[a], arr[b], arr[c] 같은 순서로 새로운 축으로 쌓은 배열이 생성
 
+    before_matrix = source_diff_sq[:, None] + target_diff_sq[None, :]    # shape (N, M) / 브로드캐스팅
+
+    # ---------------------------
+    # 4) 학생의 이산 변수 카테고리 index 행렬 생성
+    # ---------------------------
     student_var_idx = np.zeros((N, V), dtype=int)
+
     for var in selected_discrete_variable:
         v_idx = var_to_idx[var]
-        cats = category_to_idx[var].values()
-        student_var_idx[:, v_idx] = np.array([category_to_idx[var][cat] for cat in cats])
-    
-    delta = np.zeros((N, M, V, C), dtype=float)
+        # 학생의 실제 값을 → 카테고리 index로 변환
+        student_var_idx[:, v_idx] = start_group_df[var].map(category_to_idx[var]).values
+
+    # ---------------------------
+    # 5) delta_src (source 그룹 diff 변화량)
+    #    delta_tgt (target 그룹 diff 변화량)
+    # ---------------------------
+    delta_src = np.zeros((N, M, V, C), dtype=float)
+    delta_tgt = np.zeros((N, M, V, C), dtype=float)
+
+    # (N개 학생 × M개 타깃 그룹) 조합 모두에 대해
+    # 해당 학생이 가진 카테고리 위치에 +1 / -1 업데이트
     for var in selected_discrete_variable:
         v = var_to_idx[var]
-        c = student_var_idx[:, v]
-        delta[np.arange(N)[:, None], np.arange(M)[None, :], v, c[:, None]] += 1
-        delta[np.arange(N)[:, None], np.arange(M)[None, :], v, c[:, None]] -= 1
+        cat_idx = student_var_idx[:, v]             # shape (N,) 예: [0,1,0,1]
 
-    new_src = diff_matrix[source_groups][:, None, :, :] + delta
-    new_tgt = diff_matrix[target_groups][None, :, :, :] - delta
-    after_matrix = np.sum(new_src**2 + new_tgt**2, axis=(2,3))
+        # source diff는 +1 증가
+        delta_src[np.arange(N)[:, None], np.arange(M)[None, :], v, cat_idx[:, None]] += 1
 
+        # target diff는 -1 감소
+        delta_tgt[np.arange(N)[:, None], np.arange(M)[None, :], v, cat_idx[:, None]] -= 1
+
+    # ---------------------------
+    # 6) 이동 후(after) diff 계산
+    # ---------------------------
+    new_src = diff_matrix[source_groups][:, None, :, :] + delta_src   # (N, M, V, C)
+    new_tgt = diff_matrix[target_groups][None, :, :, :] + delta_tgt    # (N, M, V, C)
+
+    after_matrix = np.sum(new_src**2 + new_tgt**2, axis=(2, 3))        # shape (N, M)
+
+    # ---------------------------
+    # 7) 이동의 효과 = before - after
+    # ---------------------------
     discrete_cost_matrix = before_matrix - after_matrix
+
+    # 이득이 없는 이동(음수)는 모두 불가능 처리
     discrete_cost_matrix[discrete_cost_matrix < 0] = -np.inf
+
     return discrete_cost_matrix
 
 def compute_discrete_cost(group_diff_cost, s_row, t_g, selected_discrete_variable):
