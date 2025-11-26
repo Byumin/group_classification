@@ -2088,8 +2088,8 @@ with tabs[7]:
         st.stop()
     
     final_df = st.session_state['final_group_assign_df']
-    created_variables = st.session_state['created_variables']
-    print("Creation Variables:", created_variables)  # 디버깅용
+    selected_sort_variable_dict = st.session_state['selected_sort_variable_dict']
+    print("선택한 연속형 변수들:", selected_sort_variable_dict)  # 디버깅용
     # 그룹 번호순으로 나열
     ## 그룹 내 이름 가나다순 번호 부여
     ## 그룹 내 성별로 분류하여 번호 부여
