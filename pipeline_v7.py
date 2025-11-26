@@ -571,6 +571,7 @@ with tabs[1]:
 
     # 변수 생성 버튼
     if st.button("변수 생성"):
+        st.session_state['created_variables_flag'] = True
         if 'merged_df' in st.session_state:
             df = st.session_state['merged_df']
             for i in range(num_variables):
@@ -615,7 +616,7 @@ with tabs[1]:
         st.session_state['available_discrete_variables'] = available_discrete_variables
         # 데이터프레임 표시
         st.dataframe(df.head(10), use_container_width=True)
-    else: # 변수 생성 버튼이 눌리지 않은 경우
+    elif 'created_variables_flag' not in st.session_state or not st.session_state['created_variables_flag']: # 변수 생성 버튼이 눌리지 않은 경우 -> streamlit 구조상 버튼 누르고 탭 변경시 초기화되어 else 조건 처리가 됨
         # 기존 사이드바에서 선택한 변수 그래도 df
         # 반 편성 기준 연속형 변수 가지고오기
         available_continuous_variables = st.session_state['continuous_variable']
