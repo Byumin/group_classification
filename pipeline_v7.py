@@ -2115,6 +2115,9 @@ with tabs[6]:
 # [7] 배정 결과 내보내기
 ## 해당 소스의 대부분은 gpt 활용하여 작성됨
 with tabs[7]:
+    from openpyxl import load_workbook
+    from openpyxl.utils.dataframe import dataframe_to_rows
+
     st.subheader("최종 배정 결과 내보내기")
     st.write("최종 반 배정 결과를 엑셀 파일로 내보낼 수 있습니다.")
 
@@ -2139,11 +2142,9 @@ with tabs[7]:
     # df_1.to_excel('디버깅용_기존반번호순.xlsx', index=False) # 디버깅용
     # 2. 신규반번호순 시트
     processing_df = df_1.copy()
-    if '운동부' not in processing_df.columns:
-        processing_df['운동부'] = 0
     if '전출학생' not in processing_df.columns:
         processing_df['전출학생'] = 0
-    processing_df['번호분류코드'] = np.where(processing_df['전출학생'] == 1, 2, np.where(processing_df['운동부'] == 1, 1, 0))
+    processing_df['번호분류코드'] = np.where(processing_df['전출학생'] == 1, 1, 0)
     processing_df = processing_df.sort_values(by=['초기그룹', '번호분류코드', '이름_명렬표'])
     processing_df['번호'] = processing_df.groupby('초기그룹').cumcount() + 1
     df_2 = processing_df.sort_values(by=['초기그룹', '번호']).copy()
@@ -2165,69 +2166,85 @@ with tabs[7]:
     df_grouped_dict = {}
     for group_no, group_df in df_2.groupby('초기그룹'):
         group_df_sorted = group_df.sort_values(by=['번호']).copy()
-        df_grouped_dict[f'{group_no}반'] = group_df_sorted
-    # 앞서 모든 df 전처리 (df_1, df_2, df_grouped_dict)에서 불필요한 컬럼 제거
-    # df_1 처리
-    rename_map_1 = {}
-    drop_cols_1 = set()
-    for col in df_1.columns:
-        # 삭제 컬럼들
-        if col in ['학년', '임시반', '임시번호', '성별_명렬표', '이름_명렬표', '특이사항', 'merge_key', '번호분류코드', '그룹고정'] + created_variables: # 완벽 일치
-            drop_cols_1.add(col)
-        elif any(key in col for key in ['생기부', '해석', '상담필요', '_merge', '결시생', '운동부', '전출학생', '동명이인']): # 포함 여부
-            drop_cols_1.add(col)
-        # 이름 변경 컬럼
-        elif col == '성별_검사결과':
-            rename_map_1[col] = '성별'
-        elif col == '이름_검사결과':
-            rename_map_1[col] = '이름'
-        elif '초기그룹' in col:
-            rename_map_1[col] = '번호'
-    df_1 = df_1.rename(columns=rename_map_1).drop(columns=drop_cols_1, errors='ignore')
-    # df_2 처리
-    rename_map_2 = {}
-    drop_cols_2 = set()
-    for col in df_2.columns:
-        # 삭제 컬럼들
-        if col in ['학년', '임시반', '임시번호', '성별_명렬표', '이름_명렬표', '특이사항', 'merge_key', '번호분류코드', '그룹고정'] + created_variables: # 완벽 일치
-            drop_cols_2.add(col)
-        elif any(key in col for key in ['생기부', '해석', '상담필요', '_merge', '결시생', '운동부', '전출학생', '동명이인']): # 포함 여부
-            drop_cols_2.add(col)
-        # 이름 변경 컬럼
-        elif col == '성별_검사결과':
-            rename_map_2[col] = '성별'
-        elif col == '이름_검사결과':
-            rename_map_2[col] = '이름'
-        elif '초기그룹' in col:
-            rename_map_2[col] = '신규반'
-    df_2 = df_2.rename(columns=rename_map_2).drop(columns=drop_cols_2, errors='ignore')
-    # df_grouped_dict 처리
-    rename_map = {}
-    drop_cols = set() # 중복 방지
-    for df in df_grouped_dict.values():
-        for col in df.columns:
-            # 삭제 컬럼들
-            if col in ['학년', '임시반', '임시번호', '성별_명렬표', '이름_명렬표', '특이사항', 'merge_key', '번호분류코드', '그룹고정'] + created_variables: # 완벽 일치
-                drop_cols.add(col)
-            elif any(key in col for key in ['생기부', '해석', '상담필요', '_merge', '결시생', '운동부', '전출학생', '동명이인', '선택과목', '출신학교']): # 포함 여부
-                drop_cols.add(col)
-            # 이름 변경 컬럼
-            elif col == '성별_검사결과':
-                rename_map[col] = '성별'
-            elif col == '이름_검사결과':
-                rename_map[col] = '이름'
-            elif '초기그룹' in col:
-                rename_map[col] = '신규반'
-    for key in df_grouped_dict.keys():
-        df_grouped_dict[key] = df_grouped_dict[key].rename(columns=rename_map).drop(columns=drop_cols, errors='ignore')
+        int_group_no = int(group_no) if pd.notnull(group_no) else group_no
+        df_grouped_dict[f'{int_group_no}반'] = group_df_sorted
+
+    rename_columns = {
+        '성별_검사결과': '성별',
+        '이름_검사결과': '이름',
+        '초기그룹': '신규반',
+        '번호': '신규번호',
+        '전국기준 종합지수 백분위': '종합지수 P',
+        '상담필요': '상담여부',
+        'T점수평균': 'T점수 평균',
+        '5요인_외향성': '외향성',
+        '5요인_개방성': '개방성',
+        '5요인_친화성': '친화성',
+        '5요인_성실성': '성실성',
+        '5요인_신경증': '신경증',
+        '대인관계 / 학업생활 만족': '대인관계/학업생활 만족',
+        '만성적 학업부진': '만성적학업부진',
+        '기초학습역량_언어_T점수': '언어 T점수', 
+        '기초학습역량_논리수학_T점수': '논리수학 T점수', 
+        '기초학습역량_공간_T점수': '공간 T점수', 
+        '타당도 지표_무응답_점수': '무응답', 
+        '타당도 지표_응답성실도_점수': '응답성실도', 
+        '타당도 지표_반응 왜곡 지수_점수': '반응 왜곡 지수',
+        '외향성_사회적 친밀성_T점수': '사회적 친밀성 T점수',
+        '외향성_공동체 지향성_T점수': '공동체 지향성 T점수',
+        '정서적 민감성_우울_수준': '우울 수준', 
+        '정서적 민감성_예민성_수준': '예민성 수준', 
+        '정서적 민감성_부정적 \n대인정서_수준': '부정적 대인정서 수준', 
+        '정서적 민감성_과잉행동_수준': '과잉행동 수준'
+    }
+    df_1.rename(columns=rename_columns, inplace=True)
+    df_2.rename(columns=rename_columns, inplace=True)
+    for key in df_grouped_dict:
+        df_grouped_dict[key].rename(columns=rename_columns, inplace=True)
+
+    template_mapping = {
+        'A Type-능력': 'templates/template_A.xlsx',
+        'B Type-인성': 'templates/template_B.xlsx',
+        'C Type-학습': 'templates/template_C.xlsx',
+        'A+B Type': 'templates/template_AB.xlsx',
+        'B+C Type': 'templates/template_BC.xlsx',
+        'A+C Type': 'templates/template_AC.xlsx',
+        'Compact Type': 'templates/template_Compact.xlsx',
+    }
+    template_path = template_mapping[existing_type]
+    wb = load_workbook(template_path)
+
+    # 템플릿의 헤더 컬럼 순서에 맞춰 데이터 채우기
+    def fill_sheet(ws, df):
+        template_cols = [cell.value for cell in ws[1]]
+        available_cols = [col for col in template_cols if col in df.columns]
+        df_filtered = df[available_cols]
+        
+        for r_idx, row in enumerate(dataframe_to_rows(df_filtered, index=False, header=False), 2):
+            for c_idx, value in enumerate(row, 1):
+                ws.cell(row=r_idx, column=c_idx, value=value)
+
+    fill_sheet(wb['기존반번호순'], df_1)
+    fill_sheet(wb['신규반번호순'], df_2)
+
+    # neis 시트 생성
+    ws_neis = wb.create_sheet('neis양식', 3)
+    for r_idx, row in enumerate(dataframe_to_rows(df_3, index=False, header=True), 1):
+        for c_idx, value in enumerate(row, 1):
+            ws_neis.cell(row=r_idx, column=c_idx, value=value)
+
+    # 반별 시트 생성
+    header_cols = [cell.value for cell in wb['기존반번호순'][1]]
+    for sheet_name, group_df in df_grouped_dict.items():
+        ws = wb.create_sheet(sheet_name)
+        available_cols = [col for col in header_cols if col in group_df.columns]
+        df_filtered = group_df[available_cols]
+        for r_idx, row in enumerate(dataframe_to_rows(df_filtered, index=False, header=True), 1):
+            for c_idx, value in enumerate(row, 1):
+                ws.cell(row=r_idx, column=c_idx, value=value)
+
     buffer = io.BytesIO()
-    # 앞서 모든 시트를 하나의 엑셀 파일로 저장
-    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-        df_1.to_excel(writer, sheet_name='기존반번호순', index=False)
-        df_2.to_excel(writer, sheet_name='신규반번호순', index=False)
-        df_3.to_excel(writer, sheet_name='neis양식', index=False)
-        for sheet_name, group_df in df_grouped_dict.items():
-            group_df.to_excel(writer, sheet_name=sheet_name, index=False)
+    wb.save(buffer)
     buffer.seek(0)
     st.download_button(
         label="💾 최종 반 배정 엑셀 저장",
@@ -2236,6 +2253,7 @@ with tabs[7]:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
+# streamlit run c:/Users/USER/group_classification/pipeline_v7.py
 
 # streamlit run c:/Users/user/workspace/group_classification/pipeline_v7.py
 # streamlit run /Users/mac/insight_/group_classification/pipeline_v7.py
