@@ -705,7 +705,7 @@ with tabs[2]:
 
 # [3] 집단 분류
 with tabs[3]:
-    st.subheader("남여 합/분반 및 집단 수 설정")
+    st.subheader("남여 합/분반 및 반 수 설정")
     try:
         # 성별 분류 선택
         sex_classification = st.selectbox(
@@ -719,38 +719,38 @@ with tabs[3]:
             if sex_classification == '분반' and merged_df['성별_명렬표'].nunique() == 2:
                 # 남자 집단 갯수
                 male_class_count = st.number_input(
-                    "남자 집단의 개수를 입력하세요",
+                    "남자 반의 개수를 입력하세요",
                     min_value=1, max_value=20, value=1,
-                    help="남자 집단의 개수를 입력하세요."
+                    help="남자 반의 개수를 입력하세요."
                 )
                 # 여자 집단 갯수
                 female_class_count = st.number_input(
-                    "여자 집단의 개수를 입력하세요",
+                    "여자 반의 개수를 입력하세요",
                     min_value=1, max_value=20, value=1,
-                    help="여자 집단의 개수를 입력하세요."
+                    help="여자 반의 개수를 입력하세요."
                 )
                 st.session_state['male_class_count'] = male_class_count
                 st.session_state['female_class_count'] = female_class_count
                 st.session_state['group_count'] = male_class_count + female_class_count
             elif sex_classification == '합반' and merged_df['성별_명렬표'].nunique() == 2:
                 group_count = st.number_input(
-                    "분류할 집단의 개수를 입력하세요",
+                    "분류할 반의 개수를 입력하세요",
                     min_value=2, max_value=20, value=2,
-                    help="분류할 집단의 개수를 입력하세요."
+                    help="분류할 반의 개수를 입력하세요."
                 )
                 st.session_state['group_count'] = group_count
             elif sex_classification == '남학교' and merged_df['성별_명렬표'].nunique() == 1:
                 group_count = st.number_input(
-                    "분류할 집단의 개수를 입력하세요",
+                    "분류할 반의 개수를 입력하세요",
                     min_value=2, max_value=20, value=2,
-                    help="분류할 집단의 개수를 입력하세요."
+                    help="분류할 반의 개수를 입력하세요."
                 )
                 st.session_state['group_count'] = group_count
             elif sex_classification == '여학교' and merged_df['성별_명렬표'].nunique() == 1:
                 group_count = st.number_input(
-                    "분류할 집단의 개수를 입력하세요",
+                    "분류할 반의 개수를 입력하세요",
                     min_value=2, max_value=20, value=2,
-                    help="분류할 집단의 개수를 입력하세요."
+                    help="분류할 반의 개수를 입력하세요."
                 )
                 st.session_state['group_count'] = group_count
             else:
@@ -810,7 +810,7 @@ with tabs[3]:
     # 결시 학생 처리
     st.subheader("결시생 처리")
     absent_student_handling = st.radio(
-        "결시생을 그룹별로 균형있게 배정하시겠습니까?",
+        "결시생을 반 별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         index=0,
         help="학생 명렬표에 결시생에 대한 정보가 있는 경우 처리 가능합니다."
@@ -819,7 +819,7 @@ with tabs[3]:
     # 특수 학생 처리
     st.subheader("특수 학생 처리")
     special_student_handling = st.radio(
-        "특수 학생을 그룹별로 균형있게 배정하시겠습니까?",
+        "특수 학생을 반 별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         index=0,
         help="학생 명렬표에 특수 학생에 대한 정보가 있는 경우 처리 가능합니다."
@@ -828,7 +828,7 @@ with tabs[3]:
     # 운동부 학생 처리
     st.subheader("운동부 학생 처리")
     athlete_student_handling = st.radio(
-        "운동부 학생을 그룹별로 균형있게 배정하시겠습니까?",
+        "운동부 학생을 반 별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         index=0,
         help="학생 명렬표에 운동부 학생에 대한 정보가 있는 경우 처리 가능합니다."
@@ -837,7 +837,7 @@ with tabs[3]:
     # 전출학생 처리
     st.subheader("전출 예정 학생 처리")
     transfer_student_handling = st.radio(
-        "전출 예정 학생을 그룹별로 균형있게 배정하시겠습니까?",
+        "전출 예정 학생을 반 별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         index=0,
         help="학생 명렬표에 전출 예정 학생에 대한 정보가 있는 경우 처리 가능합니다."
@@ -846,7 +846,7 @@ with tabs[3]:
     # 출신 학교 기반 분류
     st.subheader("출신 학교 기반 분류 여부 (추후 개발)")
     school_based_classification = st.radio(
-        "출신 학교을 고려해 그룹별로 균형있게 배정하시겠습니까?",
+        "출신 학교를 고려해 반 별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         index=1,
         help="학생 명렬표에 출신 학교에 대한 정보가 있는 경우 처리 가능합니다."
