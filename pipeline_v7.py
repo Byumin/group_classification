@@ -2235,7 +2235,7 @@ with tabs[7]:
             ws_neis.cell(row=r_idx, column=c_idx, value=value)
 
     # 반별 시트 생성
-    header_cols = [cell.value for cell in wb['기존반번호순'][1]]
+    header_cols = [cell.value for cell in wb['신규반번호순'][1]]
     for sheet_name, group_df in df_grouped_dict.items():
         ws = wb.create_sheet(sheet_name)
         available_cols = [col for col in header_cols if col in group_df.columns]
