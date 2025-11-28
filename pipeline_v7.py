@@ -1452,7 +1452,7 @@ with tabs[3]:
 # [4] 학생 관계 배정-------------------------------------------------
 with tabs[4]:
     st.subheader("학생 관계 재배정")
-    st.write("학생 간의 관계를 고려하여 기존 반 배정을 조정합니다.")
+    st.write("동명이인 학생 구분을 포함한 학생 간의 관계 정보를 통합적으로 반영하여 기존 반 배정을 조정합니다.")
 
     # 주체 및 대상 검색 후 선택 및 설정
     if 'group_assign_df' in st.session_state:
@@ -1712,14 +1712,19 @@ with tabs[5]:
     import plotly.graph_objects as go
 
     st.subheader("📊 분류 후 평균 및 빈도 확인")
-    st.write("집단 분류 후 각 집단의 평균 및 범주형 분포를 확인하고, 특정 학생을 이동시켜 변화를 시뮬레이션할 수 있습니다.")
+    st.write("반 분류 후 각 반의 평균 및 범주형 분포를 확인하고, 특정 학생을 이동시켜 변화를 시뮬레이션할 수 있습니다.")
 
     # 세션에서 데이터 가져오기
-    if 'final_group_assign_df' not in st.session_state:
+    df = None
+    if 'final_group_assign_df' in st.session_state:
+        df = st.session_state['final_group_assign_df']
+    elif 'group_assign_df' in st.session_state:
+        df = st.session_state['group_assign_df']
+
+    if df is None:
         st.warning("먼저 반 배정을 완료해주세요.")
         st.stop()
-    
-    df = st.session_state['final_group_assign_df']
+
     discrete_vars = st.session_state.get('selected_discrete_variable', [])
     discrete_vars = ['성별_명렬표' if var == '성별' else var for var in discrete_vars]
     continuous_vars = list(st.session_state.get('selected_sort_variable_dict', {}).keys())
@@ -1784,11 +1789,18 @@ with tabs[5]:
         )
         st.plotly_chart(fig_mean, use_container_width=True)
 
+    if 'final_group_assign_df' not in st.session_state:
+        st.warning("⚠️ 아직 관계 배정이 완료되지 않았습니다. 학생 관계 재배정 탭에서 동명이인 처리 및 관계 배정을 먼저 진행해주세요.")
+
+
 # [6] 특정 교환 및 이동
 ## 해당 소스의 대부분은 gpt 활용하여 작성됨
 with tabs[6]:
     import plotly.express as px
     import plotly.graph_objects as go
+    if 'final_group_assign_df' not in st.session_state:
+        st.warning("⚠️ 아직 관계 배정이 완료되지 않았습니다. 학생 관계 재배정 탭에서 동명이인 처리 및 관계 배정을 먼저 진행해주세요.")
+        st.stop()
     move_swap_choice = st.selectbox('특정 학생을 이동할지 교환할지 선택해주세요.' , options=['유지', '학생 이동', '학생 교환'], key='move_or_swap_choice')
     st.session_state['move_swap_choice'] = move_swap_choice
     if st.session_state['move_swap_choice'] == '학생 이동':
