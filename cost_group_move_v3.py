@@ -1634,17 +1634,23 @@ def cost_group_move_v3(max_iter, tolerance, w_discrete, w_continuous, init_group
 
                 # 9) 최적 이동 조합 찾기
                 max_cost_change_targetgroup_indices = np.argmax(total_matrix, axis=1) # 각 학생별로 가장 큰 비용 변화의 타깃 그룹 인덱스
+                print("=== 각 학생별 최적 타깃 그룹 인덱스 ===")
                 print(max_cost_change_targetgroup_indices)
                 max_cost_change_targetgroup_values = np.max(total_matrix, axis=1)  # 이동한 학생별로 가장 큰 비용 변화 값
+                print("=== 각 학생별 최적 타깃 그룹 비용 변화 값 ===")
                 print(max_cost_change_targetgroup_values)
                 max_cost_change_student_index = np.argmax(max_cost_change_targetgroup_values) # 전체 학생 중에서 가장 큰 비용 변화 값을 가진 학생 인덱스
+                print("=== 최적 이동 학생 인덱스 ===")
                 print(max_cost_change_student_index)
                 max_cost_change_overall_value = max_cost_change_targetgroup_values[max_cost_change_student_index] # 전체 학생 중에서 가장 큰 비용 변화 값
+                print("=== 최적 이동 학생 비용 변화 값 ===")
                 print(max_cost_change_overall_value)
                 # 최적 이동 조합 출력하기 위해 배열 인덱스를 실제 학생/그룹 id로 변환
-                max_cost_change_targetgroup_no = arrayidx_to_targetgroupno[max_cost_change_student_index]
+                max_cost_change_targetgroup_no = arrayidx_to_targetgroupno[max_cost_change_targetgroup_indices[max_cost_change_student_index]]
+                print("=== 최적 이동 타깃 그룹 번호 ===")
                 print(max_cost_change_targetgroup_no)
                 max_cost_change_student_no = arrayidx_to_studentidx[max_cost_change_student_index]
+                print("=== 최적 이동 학생 번호 ===")
                 print(max_cost_change_student_no)
 
                 # 실제 학생/그룹 id로 변환

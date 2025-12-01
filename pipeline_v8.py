@@ -958,23 +958,21 @@ with tabs[3]:
                     subject_group_dict = dict(tuple(df.groupby('선택과목'))) # {'과목명': 데이터프레임}
                     # 분리된 데이터프레임 각각 처리
                     group_assign_df = pd.DataFrame()
-                    #start_group_number = 0 # 그룹 번호 조정을 위한 변수 -> 그룹명과 매칭하기 위해
+                    start_group_number = 0 # 그룹 번호 조정을 위한 변수 -> 그룹명과 매칭하기 위해
                     for subject, subject_df in subject_group_dict.items():
                         subject_group_count = st.session_state['subject_group_counts'].get(subject, 0) # 과목별 그룹 수 가지고오기 (ex 한문 2개, 일본어 1개 등)
                         st.info(f"선택과목 : {subject}, 학생 수 : {subject_df.shape[0]}, 할당된 반 수 : {subject_group_count}")
                         subject_tuples = tuple_from_df(subject_df, col_names) # 정렬할 변수 튜플화
                         sorted_idx, sorted_x, final_bin_value = suitable_bin_value(subject_tuples, subject_group_count) # 과목별 분리된 데이터에서 적절한 bin_value 탐색
                         group_assign = init_group_assign_v2(subject_tuples, subject_group_count) # 과목별 초기 그룹 배정
-                        #group_assign = [int(g_n)+1 for g_n in group_assign]
-                        # 그룹 번호 조정
-                        #group_assign = [g_n + start_group_number for g_n in group_assign]
-                        #start_group_number = start_group_number + len(np.unique(group_assign)) # 다음 과목 그룹 번호 조정을 위해
-                        # group_assign과 subject_df 병합
+                        # 초기 group_assign과 subject_df 병합
                         subject_df['초기그룹'] = group_assign
-                        group_assign_df = pd.concat([group_assign_df, subject_df], axis=0)
-                    st.session_state['group_assign_df'] = group_assign_df
-                    # cost 함수 기반으로 그룹 배정 최적화
-                    group_assign_df = cost_group_move_v3(50, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                        # cost 함수 기반으로 그룹 배정 최적화
+                        subject_group_assign_df = cost_group_move_v3(50, 0.5, 100, 1, subject_df, selected_discrete_variable, selected_sort_variable_dict)
+                        # 그룹 번호 조정은 cost_group_move_v3 후에 처리
+                        subject_group_assign_df['초기그룹'] = subject_group_assign_df['초기그룹'] + start_group_number
+                        group_assign_df = pd.concat([group_assign_df, subject_group_assign_df], axis=0)
+                        start_group_number = start_group_number + len(np.unique(subject_group_assign_df['초기그룹']))
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 반 분류가 완료되었습니다.")
                     #group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False)
@@ -986,17 +984,13 @@ with tabs[3]:
                     gender_group_dict = dict(tuple(df.groupby('성별_명렬표'))) # {'성별': 데이터프레임}
                     # 분리된 데이터프레임 각각 처리
                     group_assign_df = pd.DataFrame()
-                    #start_group_number = 0
+                    start_group_number = 0
                     for gender, gender_df in gender_group_dict.items():
                         gender_group_count = st.session_state['male_class_count'] if gender == '1' else st.session_state['female_class_count'] # 성별에 따른 그룹 수 할당
                         st.info(f"성별 : {gender}, 학생 수 : {gender_df.shape[0]}, 할당된 반 수 : {gender_group_count}")
                         gender_tuples = tuple_from_df(gender_df, col_names)
                         sorted_idx, sorted_x, final_bin_value = suitable_bin_value(gender_tuples, gender_group_count)
                         gender_group_assign = init_group_assign_v2(gender_tuples, gender_group_count)
-                        #gender_group_assign = [int(g_n)+1 for g_n in gender_group_assign]
-                        # 그룹 번호 조정
-                        #gender_group_assign = [g_n + start_group_number for g_n in gender_group_assign]
-                        #start_group_number = start_group_number + len(np.unique(gender_group_assign))
                         # group_assign과 gender_df 병합
                         gender_df['초기그룹'] = gender_group_assign
                         # cost 함수 기반으로 그룹 배정 최적화
@@ -1005,7 +999,10 @@ with tabs[3]:
                         else:
                             pass
                         gender_group_assign_df = cost_group_move_v3(50, 0.5, 100, 1, gender_df, selected_discrete_variable, selected_sort_variable_dict)
+                        # 그룹 번호 조정은 cost_group_move_v3 후에 처리
+                        gender_group_assign_df['초기그룹'] = gender_group_assign_df['초기그룹'] + start_group_number
                         group_assign_df = pd.concat([group_assign_df, gender_group_assign_df], axis=0)
+                        start_group_number = start_group_number + len(np.unique(gender_group_assign_df['초기그룹']))
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 반 분류가 완료되었습니다.")
                     #group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False)
@@ -1017,26 +1014,25 @@ with tabs[3]:
                     gender_group_dict = dict(tuple(df.groupby(['성별_명렬표', '선택과목']))) # {('성별', '과목명'): 데이터프레임}
                     # 분리된 데이터프레임 각각 처리
                     group_assign_df = pd.DataFrame()
-                    #start_group_number = 0
+                    start_group_number = 0
                     for (gender, subject), gender_subject_df in gender_group_dict.items(): # gender_subject_df : 특정 성별, 특정 과목만 있는 데이터프레임
                         gender_subject_group_count = st.session_state['gender_subject_group_counts'].get((f'{gender}_{subject}'), 0)
                         st.info(f"성별: {gender}, 선택과목 : {subject}, 학생수: {gender_subject_df.shape[0]}, 할당된 반 수 : {gender_subject_group_count}")
                         gender_tuples = tuple_from_df(gender_subject_df, col_names)
                         sorted_idx, sorted_x, final_bin_value = suitable_bin_value(gender_tuples, gender_subject_group_count)
                         group_assign = init_group_assign_v2(gender_tuples, gender_subject_group_count)
-                        #group_assign = [int(g_n)+1 for g_n in group_assign]
-                        # 그룹 번호 조정
-                        #group_assign = [g_n + start_group_number for g_n in group_assign]
-                        #start_group_number = start_group_number + len(np.unique(group_assign))
-                        # group_assign과 gender_subject_df 병합
+                        # 초기 group_assign과 gender_subject_df 병합
                         gender_subject_df['초기그룹'] = group_assign
                         # cost 함수 기반으로 그룹 배정 최적화
                         if "성별_명렬표" in selected_discrete_variable: # 이미 group by로 성별을 분리했으니 성별은 제외하고 처리
                             selected_discrete_variable.remove("성별_명렬표")
                         else:
                             pass
-                        gender_subject_df = cost_group_move_v3(50, 0.5, 100, 1, gender_subject_df, selected_discrete_variable, selected_sort_variable_dict)
-                        group_assign_df = pd.concat([group_assign_df, gender_subject_df], axis=0)
+                        gender_subject_group_assign_df = cost_group_move_v3(50, 0.5, 100, 1, gender_subject_df, selected_discrete_variable, selected_sort_variable_dict)
+                        # 그룹 번호 조정은 cost_group_move_v3 후에 처리
+                        gender_subject_group_assign_df['초기그룹'] = gender_subject_group_assign_df['초기그룹'] + start_group_number
+                        group_assign_df = pd.concat([group_assign_df, gender_subject_group_assign_df], axis=0)
+                        start_group_number = start_group_number + len(np.unique(gender_subject_group_assign_df['초기그룹']))
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 반 분류가 완료되었습니다.")
                     #group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False)
@@ -1066,22 +1062,21 @@ with tabs[3]:
                     subject_group_dict = dict(tuple(df.groupby('선택과목'))) # {'과목명': 데이터프레임}
                     # 분리된 데이터프레임 각각 처리
                     group_assign_df = pd.DataFrame()
-                    #start_group_number = 0
+                    start_group_number = 0
                     for subject, subject_df in subject_group_dict.items():
                         subject_group_count = st.session_state['subject_group_counts'].get(subject, 0) # 과목별 그룹 수 가지고오기
                         st.info(f"선택과목: {subject}, 학생 수: {subject_df.shape[0]}, 할당된 반 수: {subject_group_count}")
                         subject_tuples = tuple_from_df(subject_df, col_names)
                         sorted_idx, sorted_x, final_bin_value = suitable_bin_value(subject_tuples, subject_group_count)
                         subject_group_assign = init_group_assign_v2(subject_tuples, subject_group_count)
-                        #subject_group_assign = [int(g_n)+1 for g_n in subject_group_assign]
-                        # 그룹 번호 조정
-                        #subject_group_assign = [g_n + start_group_number for g_n in subject_group_assign]
-                        #start_group_number = start_group_number + len(np.unique(subject_group_assign))
-                        # group_assign과 subject_df 병합
+                        # 초기 group_assign과 subject_df 병합
                         subject_df['초기그룹'] = subject_group_assign
                         # cost 함수 기반으로 그룹 배정 최적화
                         subject_group_assign_df = cost_group_move_v3(50, 0.5, 100, 1, subject_df, selected_discrete_variable, selected_sort_variable_dict)
+                        # 그룹 번호 조정은 cost_group_move_v3 후에 처리
+                        subject_group_assign_df['초기그룹'] = subject_group_assign_df['초기그룹'] + start_group_number
                         group_assign_df = pd.concat([group_assign_df, subject_group_assign_df], axis=0)
+                        start_group_number = start_group_number + len(np.unique(subject_group_assign_df['초기그룹']))
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 반 분류가 완료되었습니다.")
                     #group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False)
