@@ -571,7 +571,6 @@ with tabs[1]:
 
     # 변수 생성 버튼
     if st.button("변수 생성"):
-        st.session_state['created_variables_flag'] = True
         if 'merged_df' in st.session_state:
             df = st.session_state['merged_df']
             for i in range(num_variables):
@@ -616,7 +615,7 @@ with tabs[1]:
         st.session_state['available_discrete_variables'] = available_discrete_variables
         # 데이터프레임 표시
         st.dataframe(df.head(10), use_container_width=True)
-    elif 'created_variables_flag' not in st.session_state or not st.session_state['created_variables_flag']: # 변수 생성 버튼이 눌리지 않은 경우 -> streamlit 구조상 버튼 누르고 탭 변경시 초기화되어 else 조건 처리가 됨
+    else: # 변수 생성 버튼이 눌리지 않은 경우
         # 기존 사이드바에서 선택한 변수 그래도 df
         # 반 편성 기준 연속형 변수 가지고오기
         available_continuous_variables = st.session_state['continuous_variable']
@@ -705,7 +704,7 @@ with tabs[2]:
 
 # [3] 집단 분류
 with tabs[3]:
-    st.subheader("남여 합/분반 및 반 수 설정")
+    st.subheader("남여 합/분반 및 집단 수 설정")
     try:
         # 성별 분류 선택
         sex_classification = st.selectbox(
@@ -719,38 +718,38 @@ with tabs[3]:
             if sex_classification == '분반' and merged_df['성별_명렬표'].nunique() == 2:
                 # 남자 집단 갯수
                 male_class_count = st.number_input(
-                    "남자 반의 개수를 입력하세요",
+                    "남자 집단의 개수를 입력하세요",
                     min_value=1, max_value=20, value=1,
-                    help="남자 반의 개수를 입력하세요."
+                    help="남자 집단의 개수를 입력하세요."
                 )
                 # 여자 집단 갯수
                 female_class_count = st.number_input(
-                    "여자 반의 개수를 입력하세요",
+                    "여자 집단의 개수를 입력하세요",
                     min_value=1, max_value=20, value=1,
-                    help="여자 반의 개수를 입력하세요."
+                    help="여자 집단의 개수를 입력하세요."
                 )
                 st.session_state['male_class_count'] = male_class_count
                 st.session_state['female_class_count'] = female_class_count
                 st.session_state['group_count'] = male_class_count + female_class_count
             elif sex_classification == '합반' and merged_df['성별_명렬표'].nunique() == 2:
                 group_count = st.number_input(
-                    "분류할 반의 개수를 입력하세요",
+                    "분류할 집단의 개수를 입력하세요",
                     min_value=2, max_value=20, value=2,
-                    help="분류할 반의 개수를 입력하세요."
+                    help="분류할 집단의 개수를 입력하세요."
                 )
                 st.session_state['group_count'] = group_count
             elif sex_classification == '남학교' and merged_df['성별_명렬표'].nunique() == 1:
                 group_count = st.number_input(
-                    "분류할 반의 개수를 입력하세요",
+                    "분류할 집단의 개수를 입력하세요",
                     min_value=2, max_value=20, value=2,
-                    help="분류할 반의 개수를 입력하세요."
+                    help="분류할 집단의 개수를 입력하세요."
                 )
                 st.session_state['group_count'] = group_count
             elif sex_classification == '여학교' and merged_df['성별_명렬표'].nunique() == 1:
                 group_count = st.number_input(
-                    "분류할 반의 개수를 입력하세요",
+                    "분류할 집단의 개수를 입력하세요",
                     min_value=2, max_value=20, value=2,
-                    help="분류할 반의 개수를 입력하세요."
+                    help="분류할 집단의 개수를 입력하세요."
                 )
                 st.session_state['group_count'] = group_count
             else:
@@ -810,7 +809,7 @@ with tabs[3]:
     # 결시 학생 처리
     st.subheader("결시생 처리")
     absent_student_handling = st.radio(
-        "결시생을 반 별로 균형있게 배정하시겠습니까?",
+        "결시생을 그룹별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         index=0,
         help="학생 명렬표에 결시생에 대한 정보가 있는 경우 처리 가능합니다."
@@ -819,7 +818,7 @@ with tabs[3]:
     # 특수 학생 처리
     st.subheader("특수 학생 처리")
     special_student_handling = st.radio(
-        "특수 학생을 반 별로 균형있게 배정하시겠습니까?",
+        "특수 학생을 그룹별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         index=0,
         help="학생 명렬표에 특수 학생에 대한 정보가 있는 경우 처리 가능합니다."
@@ -828,7 +827,7 @@ with tabs[3]:
     # 운동부 학생 처리
     st.subheader("운동부 학생 처리")
     athlete_student_handling = st.radio(
-        "운동부 학생을 반 별로 균형있게 배정하시겠습니까?",
+        "운동부 학생을 그룹별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         index=0,
         help="학생 명렬표에 운동부 학생에 대한 정보가 있는 경우 처리 가능합니다."
@@ -837,7 +836,7 @@ with tabs[3]:
     # 전출학생 처리
     st.subheader("전출 예정 학생 처리")
     transfer_student_handling = st.radio(
-        "전출 예정 학생을 반 별로 균형있게 배정하시겠습니까?",
+        "전출 예정 학생을 그룹별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         index=0,
         help="학생 명렬표에 전출 예정 학생에 대한 정보가 있는 경우 처리 가능합니다."
@@ -846,7 +845,7 @@ with tabs[3]:
     # 출신 학교 기반 분류
     st.subheader("출신 학교 기반 분류 여부 (추후 개발)")
     school_based_classification = st.radio(
-        "출신 학교를 고려해 반 별로 균형있게 배정하시겠습니까?",
+        "출신 학교을 고려해 그룹별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         index=1,
         help="학생 명렬표에 출신 학교에 대한 정보가 있는 경우 처리 가능합니다."
@@ -866,7 +865,7 @@ with tabs[3]:
         try:
             if all(k in st.session_state for k in ['merged_df', 'selected_algorithm', 'selected_sort_variable_dict', 'selected_discrete_variable', 'sex_classification', 'group_count', 'subject_based_classification', 'absent_student_handling', 'special_student_handling', 'school_based_classification']):
                 from init_group_assign_v2 import tuple_from_df, suitable_bin_value, init_group_assign_v2
-                from cost_group_move_v2 import compute_ideal_discrete_freq, cost_group_move_v2, compute_group_discrete_freq, compute_group_total_cost, compute_group_diff_and_sign, compute_continuous_cost, compute_discrete_cost
+                from cost_group_move_v3 import compute_ideal_discrete_freq, cost_group_move_v3, compute_group_discrete_freq, compute_group_total_cost, compute_group_diff_and_sign, compute_continuous_cost, compute_discrete_cost
                 # 병합된 데이터프레임 불러오기
                 df = st.session_state['merged_df'] # 앞에서 결시생, 동명이인 처리까지 완료된 데이터프레임
                 # 사용자가 성별을 선택한 경우 병합 후에 성별_명렬표로 명시
@@ -946,7 +945,7 @@ with tabs[3]:
                     group_assign_df['초기그룹'] = group_assign
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
-                    group_assign_df = cost_group_move_v2(50, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move_v3(50, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 반 분류가 완료되었습니다.")
                     #group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False) #! 초기 그룹 배정 저장
@@ -974,7 +973,7 @@ with tabs[3]:
                         group_assign_df = pd.concat([group_assign_df, subject_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
-                    group_assign_df = cost_group_move_v2(50, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move_v3(50, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 반 분류가 완료되었습니다.")
                     #group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False)
@@ -1004,7 +1003,7 @@ with tabs[3]:
                             selected_discrete_variable.remove("성별_명렬표")
                         else:
                             pass
-                        gender_group_assign_df = cost_group_move_v2(50, 0.5, 100, 1, gender_df, selected_discrete_variable, selected_sort_variable_dict)
+                        gender_group_assign_df = cost_group_move_v3(50, 0.5, 100, 1, gender_df, selected_discrete_variable, selected_sort_variable_dict)
                         group_assign_df = pd.concat([group_assign_df, gender_group_assign_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 반 분류가 완료되었습니다.")
@@ -1035,14 +1034,13 @@ with tabs[3]:
                             selected_discrete_variable.remove("성별_명렬표")
                         else:
                             pass
-                        gender_subject_df = cost_group_move_v2(50, 0.5, 100, 1, gender_subject_df, selected_discrete_variable, selected_sort_variable_dict)
+                        gender_subject_df = cost_group_move_v3(50, 0.5, 100, 1, gender_subject_df, selected_discrete_variable, selected_sort_variable_dict)
                         group_assign_df = pd.concat([group_assign_df, gender_subject_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 반 분류가 완료되었습니다.")
                     #group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False)
 
                 elif st.session_state['sex_classification'] == '합반' and st.session_state['subject_based_classification'] == '아니오':
-                    from cost_group_move_v3 import cost_group_move_v3
                     print('남여공학, 합반, 선택과목 없음으로 성별 비율 균형 고려하여 반 배정 시작')
                     # 적절한 bin_value 찾기
                     sorted_idx, sorted_x, final_bin_value = suitable_bin_value(tuples, st.session_state['group_count'])
@@ -1056,7 +1054,7 @@ with tabs[3]:
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
                     print('초기 배정 병합 후 이산형 변수 열 확인', )
-                    group_assign_df = cost_group_move_v3(10, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move_v3(50, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 반 분류가 완료되었습니다.")
                     #group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False)
@@ -1081,7 +1079,7 @@ with tabs[3]:
                         # group_assign과 subject_df 병합
                         subject_df['초기그룹'] = subject_group_assign
                         # cost 함수 기반으로 그룹 배정 최적화
-                        subject_group_assign_df = cost_group_move_v2(50, 0.5, 100, 1, subject_df, selected_discrete_variable, selected_sort_variable_dict)
+                        subject_group_assign_df = cost_group_move_v3(50, 0.5, 100, 1, subject_df, selected_discrete_variable, selected_sort_variable_dict)
                         group_assign_df = pd.concat([group_assign_df, subject_group_assign_df], axis=0)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 반 분류가 완료되었습니다.")
@@ -1453,7 +1451,7 @@ with tabs[3]:
 # [4] 학생 관계 배정-------------------------------------------------
 with tabs[4]:
     st.subheader("학생 관계 재배정")
-    st.write("동명이인 학생 구분을 포함한 학생 간의 관계 정보를 통합적으로 반영하여 기존 반 배정을 조정합니다.")
+    st.write("학생 간의 관계를 고려하여 기존 반 배정을 조정합니다.")
 
     # 주체 및 대상 검색 후 선택 및 설정
     if 'group_assign_df' in st.session_state:
@@ -1713,19 +1711,14 @@ with tabs[5]:
     import plotly.graph_objects as go
 
     st.subheader("📊 분류 후 평균 및 빈도 확인")
-    st.write("반 분류 후 각 반의 평균 및 범주형 분포를 확인하고, 특정 학생을 이동시켜 변화를 시뮬레이션할 수 있습니다.")
+    st.write("집단 분류 후 각 집단의 평균 및 범주형 분포를 확인하고, 특정 학생을 이동시켜 변화를 시뮬레이션할 수 있습니다.")
 
     # 세션에서 데이터 가져오기
-    df = None
-    if 'final_group_assign_df' in st.session_state:
-        df = st.session_state['final_group_assign_df']
-    elif 'group_assign_df' in st.session_state:
-        df = st.session_state['group_assign_df']
-
-    if df is None:
+    if 'final_group_assign_df' not in st.session_state:
         st.warning("먼저 반 배정을 완료해주세요.")
         st.stop()
-
+    
+    df = st.session_state['final_group_assign_df']
     discrete_vars = st.session_state.get('selected_discrete_variable', [])
     discrete_vars = ['성별_명렬표' if var == '성별' else var for var in discrete_vars]
     continuous_vars = list(st.session_state.get('selected_sort_variable_dict', {}).keys())
@@ -1790,18 +1783,11 @@ with tabs[5]:
         )
         st.plotly_chart(fig_mean, use_container_width=True)
 
-    if 'final_group_assign_df' not in st.session_state:
-        st.warning("⚠️ 아직 관계 배정이 완료되지 않았습니다. 학생 관계 재배정 탭에서 동명이인 처리 및 관계 배정을 먼저 진행해주세요.")
-
-
 # [6] 특정 교환 및 이동
 ## 해당 소스의 대부분은 gpt 활용하여 작성됨
 with tabs[6]:
     import plotly.express as px
     import plotly.graph_objects as go
-    if 'final_group_assign_df' not in st.session_state:
-        st.warning("⚠️ 아직 관계 배정이 완료되지 않았습니다. 학생 관계 재배정 탭에서 동명이인 처리 및 관계 배정을 먼저 진행해주세요.")
-        st.stop()
     move_swap_choice = st.selectbox('특정 학생을 이동할지 교환할지 선택해주세요.' , options=['유지', '학생 이동', '학생 교환'], key='move_or_swap_choice')
     st.session_state['move_swap_choice'] = move_swap_choice
     if st.session_state['move_swap_choice'] == '학생 이동':
@@ -2129,9 +2115,6 @@ with tabs[6]:
 # [7] 배정 결과 내보내기
 ## 해당 소스의 대부분은 gpt 활용하여 작성됨
 with tabs[7]:
-    from openpyxl import load_workbook
-    from openpyxl.utils.dataframe import dataframe_to_rows
-
     st.subheader("최종 배정 결과 내보내기")
     st.write("최종 반 배정 결과를 엑셀 파일로 내보낼 수 있습니다.")
 
@@ -2140,8 +2123,8 @@ with tabs[7]:
         st.stop()
     
     final_df = st.session_state['final_group_assign_df']
-    selected_sort_variable_dict = st.session_state['selected_sort_variable_dict']
-    print("선택한 연속형 변수들:", selected_sort_variable_dict)  # 디버깅용
+    created_variables = st.session_state['created_variables']
+    print("Creation Variables:", created_variables)  # 디버깅용
     # 그룹 번호순으로 나열
     ## 그룹 내 이름 가나다순 번호 부여
     ## 그룹 내 성별로 분류하여 번호 부여
@@ -2156,9 +2139,11 @@ with tabs[7]:
     # df_1.to_excel('디버깅용_기존반번호순.xlsx', index=False) # 디버깅용
     # 2. 신규반번호순 시트
     processing_df = df_1.copy()
+    if '운동부' not in processing_df.columns:
+        processing_df['운동부'] = 0
     if '전출학생' not in processing_df.columns:
         processing_df['전출학생'] = 0
-    processing_df['번호분류코드'] = np.where(processing_df['전출학생'] == 1, 1, 0)
+    processing_df['번호분류코드'] = np.where(processing_df['전출학생'] == 1, 2, np.where(processing_df['운동부'] == 1, 1, 0))
     processing_df = processing_df.sort_values(by=['초기그룹', '번호분류코드', '이름_명렬표'])
     processing_df['번호'] = processing_df.groupby('초기그룹').cumcount() + 1
     df_2 = processing_df.sort_values(by=['초기그룹', '번호']).copy()
@@ -2180,85 +2165,69 @@ with tabs[7]:
     df_grouped_dict = {}
     for group_no, group_df in df_2.groupby('초기그룹'):
         group_df_sorted = group_df.sort_values(by=['번호']).copy()
-        int_group_no = int(group_no) if pd.notnull(group_no) else group_no
-        df_grouped_dict[f'{int_group_no}반'] = group_df_sorted
-
-    rename_columns = {
-        '성별_검사결과': '성별',
-        '이름_검사결과': '이름',
-        '초기그룹': '신규반',
-        '번호': '신규번호',
-        '전국기준 종합지수 백분위': '종합지수 P',
-        '상담필요': '상담여부',
-        'T점수평균': 'T점수 평균',
-        '5요인_외향성': '외향성',
-        '5요인_개방성': '개방성',
-        '5요인_친화성': '친화성',
-        '5요인_성실성': '성실성',
-        '5요인_신경증': '신경증',
-        '대인관계 / 학업생활 만족': '대인관계/학업생활 만족',
-        '만성적 학업부진': '만성적학업부진',
-        '기초학습역량_언어_T점수': '언어 T점수', 
-        '기초학습역량_논리수학_T점수': '논리수학 T점수', 
-        '기초학습역량_공간_T점수': '공간 T점수', 
-        '타당도 지표_무응답_점수': '무응답', 
-        '타당도 지표_응답성실도_점수': '응답성실도', 
-        '타당도 지표_반응 왜곡 지수_점수': '반응 왜곡 지수',
-        '외향성_사회적 친밀성_T점수': '사회적 친밀성 T점수',
-        '외향성_공동체 지향성_T점수': '공동체 지향성 T점수',
-        '정서적 민감성_우울_수준': '우울 수준', 
-        '정서적 민감성_예민성_수준': '예민성 수준', 
-        '정서적 민감성_부정적 \n대인정서_수준': '부정적 대인정서 수준', 
-        '정서적 민감성_과잉행동_수준': '과잉행동 수준'
-    }
-    df_1.rename(columns=rename_columns, inplace=True)
-    df_2.rename(columns=rename_columns, inplace=True)
-    for key in df_grouped_dict:
-        df_grouped_dict[key].rename(columns=rename_columns, inplace=True)
-
-    template_mapping = {
-        'A Type-능력': 'templates/template_A.xlsx',
-        'B Type-인성': 'templates/template_B.xlsx',
-        'C Type-학습': 'templates/template_C.xlsx',
-        'A+B Type': 'templates/template_AB.xlsx',
-        'B+C Type': 'templates/template_BC.xlsx',
-        'A+C Type': 'templates/template_AC.xlsx',
-        'Compact Type': 'templates/template_Compact.xlsx',
-    }
-    template_path = template_mapping[existing_type]
-    wb = load_workbook(template_path)
-
-    # 템플릿의 헤더 컬럼 순서에 맞춰 데이터 채우기
-    def fill_sheet(ws, df):
-        template_cols = [cell.value for cell in ws[1]]
-        available_cols = [col for col in template_cols if col in df.columns]
-        df_filtered = df[available_cols]
-        
-        for r_idx, row in enumerate(dataframe_to_rows(df_filtered, index=False, header=False), 2):
-            for c_idx, value in enumerate(row, 1):
-                ws.cell(row=r_idx, column=c_idx, value=value)
-
-    fill_sheet(wb['기존반번호순'], df_1)
-    fill_sheet(wb['신규반번호순'], df_2)
-
-    # neis 시트 생성
-    ws_neis = wb.create_sheet('neis양식', 3)
-    for r_idx, row in enumerate(dataframe_to_rows(df_3, index=False, header=True), 1):
-        for c_idx, value in enumerate(row, 1):
-            ws_neis.cell(row=r_idx, column=c_idx, value=value)
-
-    # 반별 시트 생성
-    header_cols = [cell.value for cell in wb['신규반번호순'][1]]
-    for sheet_name, group_df in df_grouped_dict.items():
-        ws = wb.create_sheet(sheet_name)
-        available_cols = [col for col in header_cols if col in group_df.columns]
-        df_filtered = group_df[available_cols]
-        for r_idx, row in enumerate(dataframe_to_rows(df_filtered, index=False, header=True), 1):
-            for c_idx, value in enumerate(row, 1):
-                ws.cell(row=r_idx, column=c_idx, value=value)
-
+        df_grouped_dict[f'{group_no}반'] = group_df_sorted
+    # 앞서 모든 df 전처리 (df_1, df_2, df_grouped_dict)에서 불필요한 컬럼 제거
+    # df_1 처리
+    rename_map_1 = {}
+    drop_cols_1 = set()
+    for col in df_1.columns:
+        # 삭제 컬럼들
+        if col in ['학년', '임시반', '임시번호', '성별_명렬표', '이름_명렬표', '특이사항', 'merge_key', '번호분류코드', '그룹고정'] + created_variables: # 완벽 일치
+            drop_cols_1.add(col)
+        elif any(key in col for key in ['생기부', '해석', '상담필요', '_merge', '결시생', '운동부', '전출학생', '동명이인']): # 포함 여부
+            drop_cols_1.add(col)
+        # 이름 변경 컬럼
+        elif col == '성별_검사결과':
+            rename_map_1[col] = '성별'
+        elif col == '이름_검사결과':
+            rename_map_1[col] = '이름'
+        elif '초기그룹' in col:
+            rename_map_1[col] = '번호'
+    df_1 = df_1.rename(columns=rename_map_1).drop(columns=drop_cols_1, errors='ignore')
+    # df_2 처리
+    rename_map_2 = {}
+    drop_cols_2 = set()
+    for col in df_2.columns:
+        # 삭제 컬럼들
+        if col in ['학년', '임시반', '임시번호', '성별_명렬표', '이름_명렬표', '특이사항', 'merge_key', '번호분류코드', '그룹고정'] + created_variables: # 완벽 일치
+            drop_cols_2.add(col)
+        elif any(key in col for key in ['생기부', '해석', '상담필요', '_merge', '결시생', '운동부', '전출학생', '동명이인']): # 포함 여부
+            drop_cols_2.add(col)
+        # 이름 변경 컬럼
+        elif col == '성별_검사결과':
+            rename_map_2[col] = '성별'
+        elif col == '이름_검사결과':
+            rename_map_2[col] = '이름'
+        elif '초기그룹' in col:
+            rename_map_2[col] = '신규반'
+    df_2 = df_2.rename(columns=rename_map_2).drop(columns=drop_cols_2, errors='ignore')
+    # df_grouped_dict 처리
+    rename_map = {}
+    drop_cols = set() # 중복 방지
+    for df in df_grouped_dict.values():
+        for col in df.columns:
+            # 삭제 컬럼들
+            if col in ['학년', '임시반', '임시번호', '성별_명렬표', '이름_명렬표', '특이사항', 'merge_key', '번호분류코드', '그룹고정'] + created_variables: # 완벽 일치
+                drop_cols.add(col)
+            elif any(key in col for key in ['생기부', '해석', '상담필요', '_merge', '결시생', '운동부', '전출학생', '동명이인', '선택과목', '출신학교']): # 포함 여부
+                drop_cols.add(col)
+            # 이름 변경 컬럼
+            elif col == '성별_검사결과':
+                rename_map[col] = '성별'
+            elif col == '이름_검사결과':
+                rename_map[col] = '이름'
+            elif '초기그룹' in col:
+                rename_map[col] = '신규반'
+    for key in df_grouped_dict.keys():
+        df_grouped_dict[key] = df_grouped_dict[key].rename(columns=rename_map).drop(columns=drop_cols, errors='ignore')
     buffer = io.BytesIO()
-    wb.save(buffer)
+    # 앞서 모든 시트를 하나의 엑셀 파일로 저장
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        df_1.to_excel(writer, sheet_name='기존반번호순', index=False)
+        df_2.to_excel(writer, sheet_name='신규반번호순', index=False)
+        df_3.to_excel(writer, sheet_name='neis양식', index=False)
+        for sheet_name, group_df in df_grouped_dict.items():
+            group_df.to_excel(writer, sheet_name=sheet_name, index=False)
     buffer.seek(0)
     st.download_button(
         label="💾 최종 반 배정 엑셀 저장",
@@ -2267,7 +2236,6 @@ with tabs[7]:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-# streamlit run c:/Users/USER/group_classification/pipeline_v7.py
 
 # streamlit run c:/Users/user/workspace/group_classification/pipeline_v7.py
 # streamlit run /Users/mac/insight_/group_classification/pipeline_v7.py
