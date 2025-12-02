@@ -326,6 +326,11 @@ def array_diff_and_sign(ideal_freq, group_freq, selected_discrete_variable):
     """
     import numpy as np
     groups = list(group_freq.keys())
+    # diff_matrix에서의 첫번째 축은 그룹번호가 아니라 group_freq의 key 순서대로 매겨진 g_idx이므로 
+    # 매핑 데이터 추가
+    diffmatrixidx_to_groupno = {}
+    for idx, g in enumerate(groups):
+        diffmatrixidx_to_groupno[idx] = g # 예시 {0: 그룹번호0, 1: 그룹번호1, ...}
     n_groups = len(groups)
     vars_list = selected_discrete_variable
     n_vars = len(vars_list)
@@ -356,7 +361,7 @@ def array_diff_and_sign(ideal_freq, group_freq, selected_discrete_variable):
     except Exception as e:
         print("Error during array_diff_and_sign execution:", str(e))
         raise e
-    return diff_matrix, sign_matrix, var_to_idx, category_to_idx
+    return diff_matrix, sign_matrix, var_to_idx, category_to_idx, diffmatrixidx_to_groupno
 
 # 연속형 비용함수 설정
 def compute_continuous_cost(init_grouped_df, s_row, t_g, selected_sort_variable): # selected_sort_variable : 단일 변수(1순위)
@@ -566,7 +571,7 @@ def array_multi_continuous_cost(init_grouped_df, source_group_df, target_group_l
 
     return continuous_cost_matrix
 
-def array_discrete_cost_v5(selected_discrete_variable, source_group_df, group_total_cost, target_group_list, diff_matrix, var_to_idx, category_to_idx):
+def array_discrete_cost_v5(selected_discrete_variable, source_group_df, group_total_cost, target_group_list, diff_matrix, var_to_idx, category_to_idx, diffmatrixidx_to_groupno):
     import numpy as np
     #######################################################################################
     # 이동 전 비용 계산
@@ -579,14 +584,21 @@ def array_discrete_cost_v5(selected_discrete_variable, source_group_df, group_to
     V = diff_matrix.shape[1]
     C = diff_matrix.shape[2]
     print(f"N: {N}명, G: {G}번 그룹, T_G: {T_G}개 도착그룹 수, V: {V}, C: {C}")
-    before_move_source_diff_matrix = diff_matrix[source_group_no:source_group_no+1, :, :] * np.ones((N, 1, V, C))  # N x G x V x C 형태의 배열 -> 출발그룹 하나만 (확장 전)
-    #print(before_move_source_diff_matrix.shape)
-    #print(before_move_source_diff_matrix)
+    ## diff_matrix에서의 첫번째 축은 그룹번호가 아니라 group_freq의 key 순서대로 매겨진 g_idx이므로
+    ## 매핑 데이터 추가
+    groupno_to_diffmatrixidx = {}
+    for idx, g in diffmatrixidx_to_groupno.items():
+        groupno_to_diffmatrixidx[g] = idx
+    mapped_target_group_list = [groupno_to_diffmatrixidx[g] for g in target_group_list] # 도착그룹 번호를 diff_matrix 인덱스로 매핑
+    print(f"mapped_target_group_list: {mapped_target_group_list}")
+    source_group_idx = groupno_to_diffmatrixidx[source_group_no] # 출발그룹의 diff_matrix 인덱스
+    print(f"source_group_idx: {source_group_idx}")
+    ## 출발그룹 diff_matrix 추출
+    before_move_source_diff_matrix = diff_matrix[source_group_idx:source_group_idx+1, :, :]
+    before_move_source_diff_matrix = before_move_source_diff_matrix.reshape((1, 1, V, C))  # 1 x 1 x V x C 형태로 변환
+    before_move_source_diff_matrix = before_move_source_diff_matrix * np.ones((N, T_G, 1, 1))  # N x T_G x V x C 형태의 배열
+    #np.save("before_move_source_diff_matrix.npy", before_move_source_diff_matrix)
     ## 2단계
-    before_move_source_diff_matrix = before_move_source_diff_matrix * np.ones((1, T_G, 1, 1))  # N x T_G x V x C 형태의 배열
-    #print(before_move_source_diff_matrix.shape)
-    #print(before_move_source_diff_matrix)
-    ## 3단계
     ## 출발그룹 df의 각 학생의 인데스와 배열의 인덱스를 다르기 때문에 매핑 필요
     studentidx_to_arrayidx = {}
     for idx, student_idx in enumerate(source_group_df.index):
@@ -595,31 +607,27 @@ def array_discrete_cost_v5(selected_discrete_variable, source_group_df, group_to
     arrayidx_to_studentidx = {}
     for student_idx, array_idx in studentidx_to_arrayidx.items():
         arrayidx_to_studentidx[array_idx] = student_idx
-
     # 이동 전 도착그룹 비용 배열
     ## 1단계
-    before_move_target_diff_matrix = diff_matrix[target_group_list, :, :] * np.ones((N, 1, V, C))  # N x T_G x V x C 형태의 배열
-    #print(before_move_target_diff_matrix.shape)
-    #print(before_move_target_diff_matrix)
+    ## diff_matrix에서의 첫번째 축은 그룹번호가 아니라 group_freq의 key 순서대로 매겨진 g_idx이므로
+    ## mapped_target_group_list 사용해 추출
+    before_move_target_diff_matrix = diff_matrix[mapped_target_group_list, :, :]
+    before_move_target_diff_matrix = before_move_target_diff_matrix.reshape((1, T_G, V, C))  # 1 x T_G x V x C 형태로 변환
+    before_move_target_diff_matrix = before_move_target_diff_matrix * np.ones((N, 1, 1, 1))  # N x T_G x V x C 형태의 배열
+    #np.save("before_move_target_diff_matrix.npy", before_move_target_diff_matrix)
     ## 2단계
     ## 이동 전 도착그룹 diff_matrix의 idx에 따라 어떤 도착그룹인지 매핑 필요
     targetgroupno_to_arrayidx = {}
     for idx, g in enumerate(target_group_list):
         targetgroupno_to_arrayidx[g] = idx
-    #print(targetgroupno_to_arrayidx)
     ## 역매핑
     arrayidx_to_targetgroupno = {}
     for target_group_no, array_idx in targetgroupno_to_arrayidx.items():
         arrayidx_to_targetgroupno[array_idx] = target_group_no
-    #print(arrayidx_to_targetgroupno)
 
     # 이동 전 총 diff 비용 계산
-    before_cost = before_move_source_diff_matrix + before_move_target_diff_matrix
-    #print(before_cost.shape)
-    #print(before_cost)
-    before_cost = np.sum(before_cost ** 2, axis=(2,3))  # N x T_G 형태의 배열
-    #print(before_cost.shape)
-    #print(before_cost)
+    before_cost = np.sum(before_move_source_diff_matrix ** 2, axis=(2,3)) + np.sum(before_move_target_diff_matrix ** 2, axis=(2,3))  # N x T_G 형태의 배열
+    #np.save("before_cost.npy", before_cost)
     #######################################################################################
     #######################################################################################
     # 이동 후 비용 계산
@@ -636,22 +644,15 @@ def array_discrete_cost_v5(selected_discrete_variable, source_group_df, group_to
                 c_idx = category_to_idx[var][cat_value]
                 # 출발 그룹에서 해당 학생의 변수와 카테고리의 diff 값의 변화를 행렬에 반영
                 after_move_source_diff_delta_matrix[student_arrayidx, targetgroup_arrayidx, v_idx, c_idx] = 1.0
-    #print(after_move_source_diff_delta_matrix.shape)
-    #print(after_move_source_diff_delta_matrix)
     ### 2단계
     ### 출발그룹 하나만되어 있기 때문에 향후 비용 계산을 위해
     ### 도착그룹 수만큼 차원을 확장해야함
     after_move_source_diff_delta_matrix = after_move_source_diff_delta_matrix * np.ones((1, T_G, 1, 1))  # N x T_G x V x C 형태의 배열
-    #print(after_move_source_diff_delta_matrix.shape)
-    #print(after_move_source_diff_delta_matrix)
+    #np.save("after_move_source_diff_delta_matrix.npy", after_move_source_diff_delta_matrix)
     ### 3단계
     ### 변화량 반영
-    before_diff_matrix = diff_matrix[None, :, :] * np.ones((N, 1, 1, 1))  # N x G x V x C 형태로 확장
-    before_source_diff_matrix = before_diff_matrix[:, source_group_no:source_group_no+1, :, :] # 출발 그룹의 diff_matrix만 남기기 -> 1로 넣으니 차원이 생략되서 1:2로 슬라이싱
-    before_source_diff_matrix = before_source_diff_matrix * np.ones((1, T_G, 1, 1))  # N x T_G x V x C 형태로 확장
-    after_move_source_diff_matrix = before_source_diff_matrix + after_move_source_diff_delta_matrix
-    #print(after_move_source_diff_matrix.shape)
-    #print(after_move_source_diff_matrix)
+    after_move_source_diff_matrix = before_move_source_diff_matrix + after_move_source_diff_delta_matrix
+    #np.save("after_move_source_diff_matrix.npy", after_move_source_diff_matrix)
     
     ## 이동 후 도착그룹 비용 배열
     ### 1단계
@@ -659,52 +660,32 @@ def array_discrete_cost_v5(selected_discrete_variable, source_group_df, group_to
     after_move_target_diff_delta_matrix = np.zeros((N, T_G, V, C), dtype=float)  # N x T_G x V x C 형태의 배열 초기화
     for student_idx, s_row in source_group_df.iterrows(): # N으로 돌리기엔 s_row 정보가 없어서 iterrows 사용
         student_arrayidx = studentidx_to_arrayidx[student_idx] # df 인덱스와 행렬 인덱스가 다르기 때문에 사용
-        for targetgroup_arrayidx in range(G): # 도착 그룹 인덱스
+        for targetgroup_arrayidx in range(T_G): # 도착 그룹 배열 인덱스
             for var in selected_discrete_variable:
                 v_idx = var_to_idx[var]
                 cat_value = s_row[var]
                 c_idx = category_to_idx[var][cat_value]
                 # 출발 그룹에서 해당 학생의 변수와 카테고리의 diff 값의 변화를 행렬에 반영
                 after_move_target_diff_delta_matrix[student_arrayidx, targetgroup_arrayidx, v_idx, c_idx] = -1.0
-    #print(after_move_target_diff_delta_matrix.shape)
-    #print(after_move_target_diff_delta_matrix)
+    #np.save("after_move_target_diff_delta_matrix.npy", after_move_target_diff_delta_matrix)
     ### 2단계
     ### 변화량 반영
     after_move_target_diff_matrix = before_move_target_diff_matrix + after_move_target_diff_delta_matrix
-    #print(after_move_target_diff_matrix.shape)
-    #print(after_move_target_diff_matrix)
+    #np.save("after_move_target_diff_matrix.npy", after_move_target_diff_matrix)
 
     ## 이동 후 총 diff 비용 계산
-    after_cost = after_move_source_diff_matrix + after_move_target_diff_matrix
-    #print(after_cost.shape)
-    #print(after_cost)
-    after_cost = np.sum(after_cost ** 2, axis=(2,3))  # N x T_G 형태의 배열
-    #print(after_cost.shape)
-    #print(after_cost)
+    after_cost = np.sum(after_move_source_diff_matrix ** 2, axis=(2,3)) + np.sum(after_move_target_diff_matrix ** 2, axis=(2,3))  # N x T_G 형태의 배열
+    #np.save("after_cost.npy", after_cost)
     #######################################################################################
     #######################################################################################
     # 이동 전후 비용 개선 배열
     ## 총 diff 변화량 계산
     cost_change = before_cost - after_cost
-    #print(cost_change.shape)
-    #print(cost_change)
     ## 개선폭이 감소하는 경우 음수이므로 무한대 비용 처리
     cost_change[cost_change < 0] = -np.inf
-    #print(cost_change)
+    #np.save("cost_change.npy", cost_change)
     #######################################################################################
     #######################################################################################
-    # # 최적 학생 및 도착그룹
-    # ## 1단계
-    # ### 각행이 학생이므로 각 행별로 최댓값을 가지는 열 인덱스와 값을 추출
-    # max_cost_change_targetgroup_indices = np.argmax(cost_change, axis=1)  # N 형태의 배열
-    # print(max_cost_change_targetgroup_indices)
-    # max_cost_change_targetgroup_values = np.max(cost_change, axis=1)  # N 형태의 배열
-    # print(max_cost_change_targetgroup_values)
-    # ## 모든 행 중 최댓값을 가지는 행 인덱스 추출
-    # max_cost_change_student_index = np.argmax(max_cost_change_targetgroup_values)
-    # print("최대 비용 변화를 가지는 학생의 배열 인덱스:", max_cost_change_student_index)
-    # max_cost_change_overall_value = max_cost_change_targetgroup_values[max_cost_change_student_index]
-    # print("최대 비용 변화 값:", max_cost_change_overall_value)
     return cost_change, arrayidx_to_studentidx, arrayidx_to_targetgroupno
 
 def compute_discrete_cost(group_diff_cost, s_row, t_g, selected_discrete_variable):
@@ -1598,7 +1579,7 @@ def cost_group_move_v3(max_iter, tolerance, w_discrete, w_continuous, init_group
                 target_group_list = [g for g in groups if g != source_group_idx]
 
                 # 5) diff 행렬화
-                diff_matrix, sign_matrix, var_to_idx, cat_to_idx = array_diff_and_sign(
+                diff_matrix, sign_matrix, var_to_idx, cat_to_idx, diffmatrixidx_to_groupno = array_diff_and_sign(
                     ideal_freq, group_freq, selected_discrete_variable
                 )
 
@@ -1610,7 +1591,8 @@ def cost_group_move_v3(max_iter, tolerance, w_discrete, w_continuous, init_group
                     target_group_list,
                     diff_matrix,
                     var_to_idx,
-                    cat_to_idx
+                    cat_to_idx,
+                    diffmatrixidx_to_groupno
                 )
 
                 # 7) 연속형 비용 행렬 계산

@@ -901,6 +901,7 @@ with tabs[3]:
                                 continue
                             else: ## 분리할 컬럼이 있는 경우
                                 print(f"  Splitting based on column: {rule_info['flag_col']}")
+                                df[rule_info['flag_col']] = df[rule_info['flag_col']].astype(int) # 혹시 몰라 형변환(문자열 처리된 경우 대비)
                                 source_df = df[df[rule_info['flag_col']] == 1].copy() ## 분리한 기준 컬럼으로 '1'인 행 분리
                                 st.session_state[rule_info['save_session_key']] = source_df
                         # 중복 방지, 앞에서 분리된 학생 제외 처리
@@ -1119,12 +1120,12 @@ with tabs[3]:
                         for sub_group_keys, sub_group_df in grouped_dfs.items():
                             # 특수학생 중 해당 그룹에 맞는 학생 필터링
                             if groupby_cols:
-                                if isinstance(sub_group_keys, tuple): # 다중 조건일 때
+                                if len(sub_group_keys) > 1: # 다중 조건일 때 / 예시 : ('운동부', '한문')
                                     condition = pd.Series(True, index=special_student_df.index) # 특수학생 인덱스에 맞춰 true 시리즈 생성
                                     for col, key in zip(groupby_cols, sub_group_keys): # col : key 쌍으로 반복
                                         condition &= (special_student_df[col] == key) # col : key 조건 추가하여 &=으로 조건 누적
-                                else: # 단일 조건일 때
-                                    condition = (special_student_df[groupby_cols[0]] == sub_group_keys)
+                                else: # 단일 조건일 때 / 예시 : '운동부'
+                                    condition = (special_student_df[groupby_cols[0]] == sub_group_keys[0])
                                 filtered_special_student_df = special_student_df[condition].copy() # true로 남은 인덱스를 가지고 필터링
                             else: # groupby_cols가 없는 경우 전체 특수학생 대상
                                 filtered_special_student_df = special_student_df.copy()
@@ -1201,12 +1202,12 @@ with tabs[3]:
                         for sub_group_keys, sub_group_df in grouped_dfs.items():
                             # 특수학생 중 해당 그룹에 맞는 학생 필터링
                             if groupby_cols:
-                                if isinstance(sub_group_keys, tuple): # 다중 조건일 때
-                                    condition = pd.Series(True, index=special_student_df.index) # 특수학생 인덱스에 맞춰 true 시리즈 생성
+                                if len(sub_group_keys) > 1: # 다중 조건일 때
+                                    condition = pd.Series(True, index=transfer_student_df.index) # 특수학생 인덱스에 맞춰 true 시리즈 생성
                                     for col, key in zip(groupby_cols, sub_group_keys): # col : key 쌍으로 반복
-                                        condition &= (special_student_df[col] == key) # col : key 조건 추가하여 &=으로 조건 누적
+                                        condition &= (transfer_student_df[col] == key) # col : key 조건 추가하여 &=으로 조건 누적
                                 else: # 단일 조건일 때
-                                    condition = (special_student_df[groupby_cols[0]] == sub_group_keys)
+                                    condition = (transfer_student_df[groupby_cols[0]] == sub_group_keys[0])
                                 filtered_transfer_student_df = transfer_student_df[condition].copy() # true로 남은 인덱스를 가지고 필터링
                             else:
                                 filtered_transfer_student_df = transfer_student_df.copy()
@@ -1282,12 +1283,12 @@ with tabs[3]:
                         for sub_group_keys, sub_group_df in grouped_dfs.items():
                             # 운동부 중 해당 그룹에 맞는 학생 필터링
                             if groupby_cols:
-                                if isinstance(sub_group_keys, tuple): # 다중 조건일 때
+                                if len(sub_group_keys) > 1: # 다중 조건일 때
                                     condition = pd.Series(True, index=athlete_student_df.index) # 운동부 인덱스에 맞춰 true 시리즈 생성
                                     for col, key in zip(groupby_cols, sub_group_keys): # col : key 쌍으로 반복
                                         condition &= (athlete_student_df[col] == key) # col : key 조건 추가하여 &=으로 조건 누적
                                 else: # 단일 조건일 때
-                                    condition = (athlete_student_df[groupby_cols[0]] == sub_group_keys)
+                                    condition = (athlete_student_df[groupby_cols[0]] == sub_group_keys[0])
                                 filtered_athlete_student_df = athlete_student_df[condition].copy() # true로 남은 인덱스를 가지고 필터링
                             else:
                                 filtered_athlete_student_df = athlete_student_df.copy()
@@ -1364,12 +1365,12 @@ with tabs[3]:
                         for sub_group_keys, sub_group_df in grouped_dfs.items():
                             # 결시생 중 해당 그룹에 맞는 학생 필터링
                             if groupby_cols:
-                                if isinstance(sub_group_keys, tuple): # 다중 조건일 때
+                                if len(sub_group_keys) > 1: # 다중 조건일 때
                                     condition = pd.Series(True, index=absent_df.index) # 결시생 인덱스에 맞춰 true 시리즈 생성
                                     for col, key in zip(groupby_cols, sub_group_keys): # col : key 쌍으로 반복
                                         condition &= (absent_df[col] == key) # col : key 조건 추가하여 &=으로 조건 누적
                                 else: # 단일 조건일 때
-                                    condition = (absent_df[groupby_cols[0]] == sub_group_keys)
+                                    condition = (absent_df[groupby_cols[0]] == sub_group_keys[0])
                                 filtered_absent_df = absent_df[condition].copy() # true로 남은 인덱스를 가지고 필터링
                             else:
                                 filtered_absent_df = absent_df.copy()
@@ -1436,6 +1437,8 @@ with tabs[3]:
             groupby_cols = ['초기그룹'] + groupby_cols if groupby_cols else ['초기그룹']
             candidate_cols = ['특수학생', '전출예정', '운동부', '결시생']
             existing_cols = [col for col in candidate_cols if col in group_assign_df.columns]
+            for col in existing_cols:
+                group_assign_df[col] = pd.to_numeric(group_assign_df[col], errors='coerce')
             freq_df = (group_assign_df.groupby(groupby_cols)[existing_cols].sum().astype(int))
             st.markdown("##### 반 별 배정된 특이분류학생(특수학생, 전출예정, 운동부, 결시생 등) 현황")
             st.dataframe(freq_df, use_container_width=True)
@@ -2135,7 +2138,6 @@ with tabs[7]:
     
     final_df = st.session_state['final_group_assign_df']
     selected_sort_variable_dict = st.session_state['selected_sort_variable_dict']
-    print("선택한 연속형 변수들:", selected_sort_variable_dict)  # 디버깅용
     # 그룹 번호순으로 나열
     ## 그룹 내 이름 가나다순 번호 부여
     ## 그룹 내 성별로 분류하여 번호 부여
@@ -2144,19 +2146,17 @@ with tabs[7]:
 
     # 엑셀 파일로 저장
     output_filename = '최종_반_배정_결과.xlsx'
-    # final_df.to_excel(output_filename, index=False) # 디버깅용
     # 1. 기존반번호순 시트
     df_1 = final_df.sort_values(by=['학년반번호']).copy()
-    # df_1.to_excel('디버깅용_기존반번호순.xlsx', index=False) # 디버깅용
     # 2. 신규반번호순 시트
     processing_df = df_1.copy()
-    if '전출학생' not in processing_df.columns:
-        processing_df['전출학생'] = 0
-    processing_df['번호분류코드'] = np.where(processing_df['전출학생'] == 1, 1, 0)
+    if '전출예정' not in processing_df.columns:
+        processing_df['전출예정'] = 0
+    processing_df['번호분류코드'] = np.where(processing_df['전출예정'] == 1, 1, 0)
     processing_df = processing_df.sort_values(by=['초기그룹', '번호분류코드', '이름_명렬표'])
     processing_df['번호'] = processing_df.groupby('초기그룹').cumcount() + 1
     df_2 = processing_df.sort_values(by=['초기그룹', '번호']).copy()
-    # df_2.to_excel('디버깅용_신규반번호순.xlsx', index=False) # 디버깅용
+    df_2.to_excel('디버깅용_신규반번호순.xlsx', index=False) # 디버깅용
     # 3. neis양식 시트
     processing_df = df_2.copy()
     ## neis양식 컬럼명 및 순서 맞추기
