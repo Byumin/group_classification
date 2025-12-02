@@ -705,11 +705,11 @@ with tabs[2]:
 
 # [3] 집단 분류
 with tabs[3]:
-    st.subheader("남여 합/분반 및 집단 수 설정")
+    st.subheader("남여 합/분반 및 반 수 설정")
     try:
         # 성별 분류 선택
         sex_classification = st.selectbox(
-            "남여 합반/분반을 선택해 주세요.",
+            "남여 합반/분반을 선택해 주세요",
             options=["합반", "분반", "남학교", "여학교"],
             help="업로드 파일에 '성별' 컬럼이 있는지 꼭 확인해 주세요."
         )
@@ -719,38 +719,38 @@ with tabs[3]:
             if sex_classification == '분반' and merged_df['성별_명렬표'].nunique() == 2:
                 # 남자 집단 갯수
                 male_class_count = st.number_input(
-                    "남자 집단의 개수를 입력하세요",
+                    "남자 반의 개수를 입력하세요",
                     min_value=1, max_value=20, value=1,
-                    help="남자 집단의 개수를 입력하세요."
+                    help="남자 반의 개수를 입력하세요."
                 )
                 # 여자 집단 갯수
                 female_class_count = st.number_input(
-                    "여자 집단의 개수를 입력하세요",
+                    "여자 반의 개수를 입력하세요",
                     min_value=1, max_value=20, value=1,
-                    help="여자 집단의 개수를 입력하세요."
+                    help="여자 반의 개수를 입력하세요."
                 )
                 st.session_state['male_class_count'] = male_class_count
                 st.session_state['female_class_count'] = female_class_count
                 st.session_state['group_count'] = male_class_count + female_class_count
             elif sex_classification == '합반' and merged_df['성별_명렬표'].nunique() == 2:
                 group_count = st.number_input(
-                    "분류할 집단의 개수를 입력하세요",
+                    "분류할 반의 개수를 입력하세요",
                     min_value=2, max_value=20, value=2,
-                    help="분류할 집단의 개수를 입력하세요."
+                    help="분류할 반의 개수를 입력하세요."
                 )
                 st.session_state['group_count'] = group_count
             elif sex_classification == '남학교' and merged_df['성별_명렬표'].nunique() == 1:
                 group_count = st.number_input(
-                    "분류할 집단의 개수를 입력하세요",
+                    "분류할 반의 개수를 입력하세요",
                     min_value=2, max_value=20, value=2,
-                    help="분류할 집단의 개수를 입력하세요."
+                    help="분류할 반의 개수를 입력하세요."
                 )
                 st.session_state['group_count'] = group_count
             elif sex_classification == '여학교' and merged_df['성별_명렬표'].nunique() == 1:
                 group_count = st.number_input(
-                    "분류할 집단의 개수를 입력하세요",
+                    "분류할 반의 개수를 입력하세요",
                     min_value=2, max_value=20, value=2,
-                    help="분류할 집단의 개수를 입력하세요."
+                    help="분류할 반의 개수를 입력하세요."
                 )
                 st.session_state['group_count'] = group_count
             else:
@@ -810,7 +810,7 @@ with tabs[3]:
     # 결시 학생 처리
     st.subheader("결시생 처리")
     absent_student_handling = st.radio(
-        "결시생을 그룹별로 균형있게 배정하시겠습니까?",
+        "결시생을 반 별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         index=0,
         help="학생 명렬표에 결시생에 대한 정보가 있는 경우 처리 가능합니다."
@@ -819,7 +819,7 @@ with tabs[3]:
     # 특수 학생 처리
     st.subheader("특수 학생 처리")
     special_student_handling = st.radio(
-        "특수 학생을 그룹별로 균형있게 배정하시겠습니까?",
+        "특수 학생을 반 별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         index=0,
         help="학생 명렬표에 특수 학생에 대한 정보가 있는 경우 처리 가능합니다."
@@ -828,7 +828,7 @@ with tabs[3]:
     # 운동부 학생 처리
     st.subheader("운동부 학생 처리")
     athlete_student_handling = st.radio(
-        "운동부 학생을 그룹별로 균형있게 배정하시겠습니까?",
+        "운동부 학생을 반 별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         index=0,
         help="학생 명렬표에 운동부 학생에 대한 정보가 있는 경우 처리 가능합니다."
@@ -837,7 +837,7 @@ with tabs[3]:
     # 전출학생 처리
     st.subheader("전출 예정 학생 처리")
     transfer_student_handling = st.radio(
-        "전출 예정 학생을 그룹별로 균형있게 배정하시겠습니까?",
+        "전출 예정 학생을 반 별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         index=0,
         help="학생 명렬표에 전출 예정 학생에 대한 정보가 있는 경우 처리 가능합니다."
@@ -846,7 +846,7 @@ with tabs[3]:
     # 출신 학교 기반 분류
     st.subheader("출신 학교 기반 분류 여부 (추후 개발)")
     school_based_classification = st.radio(
-        "출신 학교을 고려해 그룹별로 균형있게 배정하시겠습니까?",
+        "출신 학교을 고려해 반 별로 균형있게 배정하시겠습니까?",
         options=["예", "아니오"],
         index=1,
         help="학생 명렬표에 출신 학교에 대한 정보가 있는 경우 처리 가능합니다."
@@ -1437,7 +1437,7 @@ with tabs[3]:
             candidate_cols = ['특수학생', '전출예정', '운동부', '결시생']
             existing_cols = [col for col in candidate_cols if col in group_assign_df.columns]
             freq_df = (group_assign_df.groupby(groupby_cols)[existing_cols].sum().astype(int))
-            st.markdown("##### 그룹별 배정된 특이분류학생(특수학생, 전출예정, 운동부, 결시생 등) 현황")
+            st.markdown("##### 반 별 배정된 특이분류학생(특수학생, 전출예정, 운동부, 결시생 등) 현황")
             st.dataframe(freq_df, use_container_width=True)
         except Exception as e:
             import traceback
@@ -1447,7 +1447,7 @@ with tabs[3]:
 # [4] 학생 관계 배정-------------------------------------------------
 with tabs[4]:
     st.subheader("학생 관계 재배정")
-    st.write("학생 간의 관계를 고려하여 기존 반 배정을 조정합니다.")
+    st.write("동명이인 학생 구분을 포함한 학생 간의 관계 정보를 통합적으로 반영하여 기존 반 배정을 조정합니다.")
 
     # 주체 및 대상 검색 후 선택 및 설정
     if 'group_assign_df' in st.session_state:
