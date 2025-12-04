@@ -1441,7 +1441,7 @@ with tabs[3]:
                 group_assign_df[col] = pd.to_numeric(group_assign_df[col], errors='coerce')
             freq_df = (group_assign_df.groupby(groupby_cols)[existing_cols].sum().astype(int))
             st.markdown("##### 반 별 배정된 특이분류학생(특수학생, 전출예정, 운동부, 결시생 등) 현황")
-            st.dataframe(freq_df, use_container_width=True)
+            st.dataframe(freq_df.copy().rename(index=lambda x: x+1), use_container_width=True)
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -1731,7 +1731,7 @@ with tabs[5]:
     # -------------------------------------------------------------
     # ① 그룹별 이산형 변수 빈도 시각화
     # -------------------------------------------------------------
-    st.markdown("### 🎯 그룹별 이산형 변수 분포")
+    st.markdown("### 🎯 반 별 이산형 변수 분포")
     # 그룹별 크기 시각화
     group_size_df = (
         df.groupby('초기그룹')['merge_key']
@@ -1740,11 +1740,10 @@ with tabs[5]:
         .sort_values('학생 수', ascending=False)
     )
     fig_size = px.bar(
-        group_size_df,
-        x='초기그룹',
-        y='학생 수',
+        group_size_df.assign(초기그룹=group_size_df['초기그룹'] + 1),
+        x='초기그룹', y='학생 수',
         color_discrete_sequence=["#4C78A8"],
-        title="📊 그룹별 학생 수 분포",
+        title="📊 반 별 학생 수 분포",
         text='학생 수'
     )
     st.plotly_chart(fig_size, use_container_width=True)
@@ -1759,8 +1758,10 @@ with tabs[5]:
               .reset_index(name='빈도')
         )
         fig_cat = px.bar(
-            freq_df, x='초기그룹', y='빈도', color=selected_discrete,
-            barmode='stack', title=f"그룹별 {selected_discrete} 분포"
+            freq_df.assign(초기그룹=freq_df['초기그룹'] + 1), 
+            x='초기그룹', y='빈도', 
+            color=selected_discrete,
+            barmode='stack', title=f"반 별 {selected_discrete} 분포"
         )
         st.plotly_chart(fig_cat, use_container_width=True)
 
@@ -1782,7 +1783,8 @@ with tabs[5]:
         )
         mean_df['평균'] = mean_df['평균'].round(2)
         fig_mean = px.bar(
-            mean_df, x='초기그룹', y='평균', title=f"그룹별 {selected_continuous} 평균 비교",
+            mean_df.assign(초기그룹=mean_df['초기그룹'] + 1),
+            x='초기그룹', y='평균', title=f"반 별 {selected_continuous} 평균 비교",
             text='평균'
         )
         st.plotly_chart(fig_mean, use_container_width=True)
