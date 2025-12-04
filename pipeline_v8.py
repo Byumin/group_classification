@@ -1684,7 +1684,7 @@ with tabs[4]:
                     st.info("현재 관계 설정이 걸려 있는 학생이 없습니다.")
                 else:
                     st.write(f"총 {len(related_df)}명")
-                    st.dataframe(related_df, use_container_width=True)
+                    st.dataframe(related_df.assign(초기그룹=related_df['초기그룹']+1), use_container_width=True) ####################################
                     # 필요하다면 관계 컬럼 표시용 summary도 추가 가능
                     relation_summary = []
                     for a, rels in relationship_dict.items():
@@ -1696,7 +1696,10 @@ with tabs[4]:
                     relation_summary_df['학생A_그룹'] = relation_summary_df['학생A'].map(final_group_assign_df.set_index('merge_key')['초기그룹'])
                     relation_summary_df['학생B_그룹'] = relation_summary_df['학생B'].map(final_group_assign_df.set_index('merge_key')['초기그룹'])
                     with st.expander("🔍 관계 상세 보기"):
-                        st.dataframe(relation_summary_df, use_container_width=True)
+                        st.dataframe(relation_summary_df.assign(
+                            학생A_그룹=relation_summary_df['학생A_그룹']+1,
+                            학생B_그룹=relation_summary_df['학생B_그룹']+1
+                        ), use_container_width=True)
 
             else:
                 st.warning("먼저 반 배정(group_assign_df)을 생성해주세요.")
@@ -2138,7 +2141,8 @@ with tabs[7]:
         st.warning("먼저 반 배정을 완료해주세요.")
         st.stop()
     
-    final_df = st.session_state['final_group_assign_df']
+    final_df = st.session_state['final_group_assign_df'].copy()
+    final_df['초기그룹'] = final_df['초기그룹'] + 1
     selected_sort_variable_dict = st.session_state['selected_sort_variable_dict']
     # 그룹 번호순으로 나열
     ## 그룹 내 이름 가나다순 번호 부여
