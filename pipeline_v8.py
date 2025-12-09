@@ -629,7 +629,7 @@ with tabs[1]:
 # [2] 분류 알고리즘
 with tabs[2]:
     #st.header("분류 방법 선택")
-    st.write("집단을 분류하고자 할때 사용할 방법을 선택할 수 있습니다.")
+    st.write("반을 분류하고자 할때 사용할 방법을 선택할 수 있습니다.")
     try:
         available_continuous_variables = st.session_state['available_continuous_variables']
         print('제대로 가지고 오는지', available_continuous_variables)
@@ -644,7 +644,7 @@ with tabs[2]:
         selected_algorithm = st.selectbox(
             "사용할 알고리즘을 선택하세요",
             options=list(algorithms.keys()),
-            help="집단 분류에 사용할 알고리즘을 선택하세요."
+            help="반 분류에 사용할 알고리즘을 선택하세요."
         )
         st.session_state['selected_algorithm'] = selected_algorithm
 
@@ -686,11 +686,11 @@ with tabs[2]:
             st.session_state['selected_sort_variable_dict'] = selected_sort_variable
 
             # 그룹별 균형을 맞춰야하는 범주형 변수 파라미터 설정
-            st.subheader("그룹별 균형을 맞춰야하는 범주형 변수")
+            st.subheader("반 별 균형을 맞춰야하는 범주형 변수")
             selected_discrete_variable = st.multiselect(
                 "범주형 변수를 선택하세요",
                 options=available_discrete_variables,
-                help="그룹별 균형을 맞추고자 하는 범주형 변수를 선택하세요."
+                help="반 별 균형을 맞추고자 하는 범주형 변수를 선택하세요."
                 )
             # 범주형 변수 선택이 없을 수 있음.
             st.session_state['selected_discrete_variable'] = selected_discrete_variable
@@ -1441,7 +1441,7 @@ with tabs[3]:
                 group_assign_df[col] = pd.to_numeric(group_assign_df[col], errors='coerce')
             freq_df = (group_assign_df.groupby(groupby_cols)[existing_cols].sum().astype(int))
             st.markdown("##### 반 별 배정된 특이분류학생(특수학생, 전출예정, 운동부, 결시생 등) 현황")
-            st.dataframe(freq_df.copy().rename(index=lambda x: x+1), use_container_width=True)
+            st.dataframe(freq_df.reset_index().assign(초기그룹=lambda x: x['초기그룹'] + 1), use_container_width=True, hide_index=True)
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -1684,7 +1684,7 @@ with tabs[4]:
                     st.info("현재 관계 설정이 걸려 있는 학생이 없습니다.")
                 else:
                     st.write(f"총 {len(related_df)}명")
-                    st.dataframe(related_df.assign(초기그룹=related_df['초기그룹']+1), use_container_width=True) ####################################
+                    st.dataframe(related_df.assign(초기그룹=related_df['초기그룹']+1), use_container_width=True)
                     # 필요하다면 관계 컬럼 표시용 summary도 추가 가능
                     relation_summary = []
                     for a, rels in relationship_dict.items():
@@ -2163,7 +2163,7 @@ with tabs[7]:
     processing_df = processing_df.sort_values(by=['초기그룹', '번호분류코드', '이름_명렬표'])
     processing_df['번호'] = processing_df.groupby('초기그룹').cumcount() + 1
     df_2 = processing_df.sort_values(by=['초기그룹', '번호']).copy()
-    df_2.to_excel('디버깅용_신규반번호순.xlsx', index=False) # 디버깅용
+    # df_2.to_excel('디버깅용_신규반번호순.xlsx', index=False) # 디버깅용
     # 3. neis양식 시트
     processing_df = df_2.copy()
     ## neis양식 컬럼명 및 순서 맞추기
@@ -2216,6 +2216,14 @@ with tabs[7]:
     df_2.rename(columns=rename_columns, inplace=True)
     for key in df_grouped_dict:
         df_grouped_dict[key].rename(columns=rename_columns, inplace=True)
+
+    if '상담여부' in df_1.columns:
+        df_1['상담여부'] = df_1['상담여부'].apply(lambda x: 'V' if x == '1' else '')
+    if '상담여부' in df_2.columns:
+        df_2['상담여부'] = df_2['상담여부'].apply(lambda x: 'V' if x == '1' else '')
+    for key in df_grouped_dict:
+        if '상담여부' in df_grouped_dict[key].columns:
+            df_grouped_dict[key]['상담여부'] = df_grouped_dict[key]['상담여부'].apply(lambda x: 'V' if x == '1' else '')
 
     template_mapping = {
         'A Type-능력': 'templates/template_A.xlsx',
