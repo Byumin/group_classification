@@ -2248,6 +2248,13 @@ with tabs[7]:
     # 템플릿의 헤더 컬럼 순서에 맞춰 데이터 채우기
     def fill_sheet(ws, df):
         template_cols = [cell.value for cell in ws[1]]
+        if '선택과목' in df.columns:
+            insert_idx = template_cols.index('이름') + 1
+            ws.insert_cols(insert_idx + 1)
+            new_header = ws.cell(row=1, column=insert_idx+1, value='선택과목')
+            new_header.border = thin_border
+            new_header.alignment = center_align
+            template_cols.insert(insert_idx, '선택과목')
         available_cols = [col for col in template_cols if col in df.columns]
         df_filtered = df[available_cols]
         
