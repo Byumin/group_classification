@@ -1808,7 +1808,7 @@ with tabs[6]:
     st.session_state['move_swap_choice'] = move_swap_choice
     if st.session_state['move_swap_choice'] == '학생 이동':
         st.markdown("#### 학생 이동 시뮬레이션")
-        st.write("특정 학생을 다른 그룹으로 이동시켜 평균 및 빈도 변화 시뮬레이션을 수행할 수 있습니다.")
+        st.write("특정 학생을 다른 반으로 이동시켜 평균 및 빈도 변화 시뮬레이션을 수행할 수 있습니다.")
         final_sex_choice = st.session_state['sex_classification']
         final_subject_choice = st.session_state['subject_based_classification']
         df = st.session_state['final_group_assign_df']
@@ -2133,6 +2133,7 @@ with tabs[6]:
 with tabs[7]:
     from openpyxl import load_workbook
     from openpyxl.utils.dataframe import dataframe_to_rows
+    from openpyxl.styles import Border, Side, Alignment
 
     st.subheader("최종 배정 결과 내보내기")
     st.write("최종 반 배정 결과를 엑셀 파일로 내보낼 수 있습니다.")
@@ -2228,6 +2229,14 @@ with tabs[7]:
     template_path = template_mapping[existing_type]
     wb = load_workbook(template_path)
 
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    center_align = Alignment(horizontal='center', vertical='center')
+
     # 템플릿의 헤더 컬럼 순서에 맞춰 데이터 채우기
     def fill_sheet(ws, df):
         template_cols = [cell.value for cell in ws[1]]
@@ -2236,7 +2245,9 @@ with tabs[7]:
         
         for r_idx, row in enumerate(dataframe_to_rows(df_filtered, index=False, header=False), 2):
             for c_idx, value in enumerate(row, 1):
-                ws.cell(row=r_idx, column=c_idx, value=value)
+                cell = ws.cell(row=r_idx, column=c_idx, value=value)
+                cell.border = thin_border
+                cell.alignment = center_align
 
     fill_sheet(wb['기존반번호순'], df_1)
     fill_sheet(wb['신규반번호순'], df_2)
@@ -2245,7 +2256,9 @@ with tabs[7]:
     ws_neis = wb.create_sheet('neis양식', 3)
     for r_idx, row in enumerate(dataframe_to_rows(df_3, index=False, header=True), 1):
         for c_idx, value in enumerate(row, 1):
-            ws_neis.cell(row=r_idx, column=c_idx, value=value)
+            cell = ws_neis.cell(row=r_idx, column=c_idx, value=value)
+            cell.border = thin_border
+            cell.alignment = center_align
 
     # 반별 시트 생성
     header_cols = [cell.value for cell in wb['신규반번호순'][1]]
@@ -2255,7 +2268,9 @@ with tabs[7]:
         df_filtered = group_df[available_cols]
         for r_idx, row in enumerate(dataframe_to_rows(df_filtered, index=False, header=True), 1):
             for c_idx, value in enumerate(row, 1):
-                ws.cell(row=r_idx, column=c_idx, value=value)
+                cell = ws.cell(row=r_idx, column=c_idx, value=value)
+                cell.border = thin_border
+                cell.alignment = center_align
 
     buffer = io.BytesIO()
     wb.save(buffer)
