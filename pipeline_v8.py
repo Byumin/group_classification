@@ -632,7 +632,7 @@ with tabs[1]:
 # [2] 분류 알고리즘
 with tabs[2]:
     #st.header("분류 방법 선택")
-    st.write("집단을 분류하고자 할때 사용할 방법을 선택할 수 있습니다.")
+    st.write("반을 분류하고자 할때 사용할 방법을 선택할 수 있습니다.")
     try:
         available_continuous_variables = st.session_state['available_continuous_variables']
         print('제대로 가지고 오는지', available_continuous_variables)
@@ -647,7 +647,7 @@ with tabs[2]:
         selected_algorithm = st.selectbox(
             "사용할 알고리즘을 선택하세요",
             options=list(algorithms.keys()),
-            help="집단 분류에 사용할 알고리즘을 선택하세요."
+            help="반 분류에 사용할 알고리즘을 선택하세요."
         )
         st.session_state['selected_algorithm'] = selected_algorithm
 
@@ -689,11 +689,11 @@ with tabs[2]:
             st.session_state['selected_sort_variable_dict'] = selected_sort_variable
 
             # 그룹별 균형을 맞춰야하는 범주형 변수 파라미터 설정
-            st.subheader("그룹별 균형을 맞춰야하는 범주형 변수")
+            st.subheader("반 별 균형을 맞춰야하는 범주형 변수")
             selected_discrete_variable = st.multiselect(
                 "범주형 변수를 선택하세요",
                 options=available_discrete_variables,
-                help="그룹별 균형을 맞추고자 하는 범주형 변수를 선택하세요."
+                help="반 별 균형을 맞추고자 하는 범주형 변수를 선택하세요."
                 )
             # 범주형 변수 선택이 없을 수 있음.
             st.session_state['selected_discrete_variable'] = selected_discrete_variable
@@ -1444,7 +1444,7 @@ with tabs[3]:
                 group_assign_df[col] = pd.to_numeric(group_assign_df[col], errors='coerce')
             freq_df = (group_assign_df.groupby(groupby_cols)[existing_cols].sum().astype(int))
             st.markdown("##### 반 별 배정된 특이분류학생(특수학생, 전출예정, 운동부, 결시생 등) 현황")
-            st.dataframe(freq_df, use_container_width=True)
+            st.dataframe(freq_df.reset_index().assign(초기그룹=lambda x: x['초기그룹'] + 1), use_container_width=True, hide_index=True)
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -1687,7 +1687,7 @@ with tabs[4]:
                     st.info("현재 관계 설정이 걸려 있는 학생이 없습니다.")
                 else:
                     st.write(f"총 {len(related_df)}명")
-                    st.dataframe(related_df, use_container_width=True)
+                    st.dataframe(related_df.assign(초기그룹=related_df['초기그룹']+1), use_container_width=True)
                     # 필요하다면 관계 컬럼 표시용 summary도 추가 가능
                     relation_summary = []
                     for a, rels in relationship_dict.items():
@@ -1699,7 +1699,10 @@ with tabs[4]:
                     relation_summary_df['학생A_그룹'] = relation_summary_df['학생A'].map(final_group_assign_df.set_index('merge_key')['초기그룹'])
                     relation_summary_df['학생B_그룹'] = relation_summary_df['학생B'].map(final_group_assign_df.set_index('merge_key')['초기그룹'])
                     with st.expander("🔍 관계 상세 보기"):
-                        st.dataframe(relation_summary_df, use_container_width=True)
+                        st.dataframe(relation_summary_df.assign(
+                            학생A_그룹=relation_summary_df['학생A_그룹']+1,
+                            학생B_그룹=relation_summary_df['학생B_그룹']+1
+                        ), use_container_width=True)
 
             else:
                 st.warning("먼저 반 배정(group_assign_df)을 생성해주세요.")
@@ -1734,7 +1737,7 @@ with tabs[5]:
     # -------------------------------------------------------------
     # ① 그룹별 이산형 변수 빈도 시각화
     # -------------------------------------------------------------
-    st.markdown("### 🎯 그룹별 이산형 변수 분포")
+    st.markdown("### 🎯 반 별 이산형 변수 분포")
     # 그룹별 크기 시각화
     group_size_df = (
         df.groupby('초기그룹')['merge_key']
@@ -1743,11 +1746,10 @@ with tabs[5]:
         .sort_values('학생 수', ascending=False)
     )
     fig_size = px.bar(
-        group_size_df,
-        x='초기그룹',
-        y='학생 수',
+        group_size_df.assign(초기그룹=group_size_df['초기그룹'] + 1),
+        x='초기그룹', y='학생 수',
         color_discrete_sequence=["#4C78A8"],
-        title="📊 그룹별 학생 수 분포",
+        title="📊 반 별 학생 수 분포",
         text='학생 수'
     )
     st.plotly_chart(fig_size, use_container_width=True)
@@ -1762,8 +1764,10 @@ with tabs[5]:
               .reset_index(name='빈도')
         )
         fig_cat = px.bar(
-            freq_df, x='초기그룹', y='빈도', color=selected_discrete,
-            barmode='stack', title=f"그룹별 {selected_discrete} 분포"
+            freq_df.assign(초기그룹=freq_df['초기그룹'] + 1), 
+            x='초기그룹', y='빈도', 
+            color=selected_discrete,
+            barmode='stack', title=f"반 별 {selected_discrete} 분포"
         )
         st.plotly_chart(fig_cat, use_container_width=True)
 
@@ -1785,7 +1789,8 @@ with tabs[5]:
         )
         mean_df['평균'] = mean_df['평균'].round(2)
         fig_mean = px.bar(
-            mean_df, x='초기그룹', y='평균', title=f"그룹별 {selected_continuous} 평균 비교",
+            mean_df.assign(초기그룹=mean_df['초기그룹'] + 1),
+            x='초기그룹', y='평균', title=f"반 별 {selected_continuous} 평균 비교",
             text='평균'
         )
         st.plotly_chart(fig_mean, use_container_width=True)
@@ -1811,7 +1816,7 @@ with tabs[6]:
     st.session_state['move_swap_choice'] = move_swap_choice
     if st.session_state['move_swap_choice'] == '학생 이동':
         st.markdown("#### 학생 이동 시뮬레이션")
-        st.write("특정 학생을 다른 그룹으로 이동시켜 평균 및 빈도 변화 시뮬레이션을 수행할 수 있습니다.")
+        st.write("특정 학생을 다른 반으로 이동시켜 평균 및 빈도 변화 시뮬레이션을 수행할 수 있습니다.")
         final_sex_choice = st.session_state['sex_classification']
         final_subject_choice = st.session_state['subject_based_classification']
         df = st.session_state['final_group_assign_df']
@@ -2170,6 +2175,7 @@ with tabs[6]:
 with tabs[7]:
     from openpyxl import load_workbook
     from openpyxl.utils.dataframe import dataframe_to_rows
+    from openpyxl.styles import Border, Side, Alignment
 
     st.subheader("최종 배정 결과 내보내기")
     st.write("최종 반 배정 결과를 엑셀 파일로 내보낼 수 있습니다.")
@@ -2178,7 +2184,8 @@ with tabs[7]:
         st.warning("먼저 반 배정을 완료해주세요.")
         st.stop()
     
-    final_df = st.session_state['final_group_assign_df']
+    final_df = st.session_state['final_group_assign_df'].copy()
+    final_df['초기그룹'] = final_df['초기그룹'] + 1
     selected_sort_variable_dict = st.session_state['selected_sort_variable_dict']
     # 그룹 번호순으로 나열
     ## 그룹 내 이름 가나다순 번호 부여
@@ -2198,7 +2205,7 @@ with tabs[7]:
     processing_df = processing_df.sort_values(by=['초기그룹', '번호분류코드', '이름_명렬표'])
     processing_df['번호'] = processing_df.groupby('초기그룹').cumcount() + 1
     df_2 = processing_df.sort_values(by=['초기그룹', '번호']).copy()
-    df_2.to_excel('디버깅용_신규반번호순.xlsx', index=False) # 디버깅용
+    # df_2.to_excel('디버깅용_신규반번호순.xlsx', index=False) # 디버깅용
     # 3. neis양식 시트
     processing_df = df_2.copy()
     ## neis양식 컬럼명 및 순서 맞추기
@@ -2252,6 +2259,14 @@ with tabs[7]:
     for key in df_grouped_dict:
         df_grouped_dict[key].rename(columns=rename_columns, inplace=True)
 
+    if '상담여부' in df_1.columns:
+        df_1['상담여부'] = df_1['상담여부'].apply(lambda x: 'V' if x == '1' else '')
+    if '상담여부' in df_2.columns:
+        df_2['상담여부'] = df_2['상담여부'].apply(lambda x: 'V' if x == '1' else '')
+    for key in df_grouped_dict:
+        if '상담여부' in df_grouped_dict[key].columns:
+            df_grouped_dict[key]['상담여부'] = df_grouped_dict[key]['상담여부'].apply(lambda x: 'V' if x == '1' else '')
+
     template_mapping = {
         'A Type-능력': 'templates/template_A.xlsx',
         'B Type-인성': 'templates/template_B.xlsx',
@@ -2264,15 +2279,35 @@ with tabs[7]:
     template_path = template_mapping[existing_type]
     wb = load_workbook(template_path)
 
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    center_align = Alignment(horizontal='center', vertical='center')
+
     # 템플릿의 헤더 컬럼 순서에 맞춰 데이터 채우기
     def fill_sheet(ws, df):
         template_cols = [cell.value for cell in ws[1]]
+        if '선택과목' in df.columns:
+            # has_data = df['선택과목'].notna().any()
+            has_data = df['선택과목'].apply(lambda x: str(x).lower() != 'nan').any()
+            if has_data:
+                insert_idx = template_cols.index('이름') + 1
+                ws.insert_cols(insert_idx + 1)
+                new_header = ws.cell(row=1, column=insert_idx+1, value='선택과목')
+                new_header.border = thin_border
+                new_header.alignment = center_align
+                template_cols.insert(insert_idx, '선택과목')
         available_cols = [col for col in template_cols if col in df.columns]
         df_filtered = df[available_cols]
         
         for r_idx, row in enumerate(dataframe_to_rows(df_filtered, index=False, header=False), 2):
             for c_idx, value in enumerate(row, 1):
-                ws.cell(row=r_idx, column=c_idx, value=value)
+                cell = ws.cell(row=r_idx, column=c_idx, value=value)
+                cell.border = thin_border
+                cell.alignment = center_align
 
     fill_sheet(wb['기존반번호순'], df_1)
     fill_sheet(wb['신규반번호순'], df_2)
@@ -2281,7 +2316,9 @@ with tabs[7]:
     ws_neis = wb.create_sheet('neis양식', 3)
     for r_idx, row in enumerate(dataframe_to_rows(df_3, index=False, header=True), 1):
         for c_idx, value in enumerate(row, 1):
-            ws_neis.cell(row=r_idx, column=c_idx, value=value)
+            cell = ws_neis.cell(row=r_idx, column=c_idx, value=value)
+            cell.border = thin_border
+            cell.alignment = center_align
 
     # 반별 시트 생성
     header_cols = [cell.value for cell in wb['신규반번호순'][1]]
@@ -2291,7 +2328,9 @@ with tabs[7]:
         df_filtered = group_df[available_cols]
         for r_idx, row in enumerate(dataframe_to_rows(df_filtered, index=False, header=True), 1):
             for c_idx, value in enumerate(row, 1):
-                ws.cell(row=r_idx, column=c_idx, value=value)
+                cell = ws.cell(row=r_idx, column=c_idx, value=value)
+                cell.border = thin_border
+                cell.alignment = center_align
 
     buffer = io.BytesIO()
     wb.save(buffer)
