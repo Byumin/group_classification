@@ -469,7 +469,6 @@ with tabs[0]:
                 # 무조건 merge_key로 병합
                 merged_df = pd.merge(student_df, raw_df, on='merge_key', how='outer', indicator=True, suffixes=('_명렬표', '_검사결과'))
                 st.session_state['merged_df'] = merged_df
-                merged_df.to_excel("merged_df_test.xlsx", index=False) # 디버깅용
         else :
             st.error("검사 결과에만 있는 학생이 있습니다. 명렬표와 검사 결과를 다시 확인해주세요.")
         # 병합된 데이터프레임 기반으로 결시생, 동명이인(성+이름 동일) 처리
@@ -1446,6 +1445,7 @@ with tabs[3]:
             freq_df = (group_assign_df.groupby(groupby_cols)[existing_cols].sum().astype(int))
             st.markdown("##### 반 별 배정된 특이분류학생(특수학생, 전출예정, 운동부, 결시생 등) 현황")
             st.dataframe(freq_df.reset_index().assign(초기그룹=lambda x: x['초기그룹'] + 1), use_container_width=True, hide_index=True)
+            group_assign_df.to_excel('group_assign_df_초기반분류완료.xlsx', index=False) #! 초기 반 분류 완료 저장
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -1655,6 +1655,11 @@ with tabs[4]:
                         target_n_groups=group_assign_df['초기그룹'].nunique(),
                         verbose=True
                     )
+                    with open("relation_groups.txt", "w", encoding="utf-8") as f:
+                        for g in groups:
+                            f.write(str(g) + "\n")
+                        f.write(f"타깃 그룹 수: {group_assign_df['초기그룹'].nunique()}\n")
+                        f.write(f"관계 딕셔너리: {relationship_dict}\n")
                     relationship_group_dict, relationship_group_df_dict = relation_groups_to_dict(groups, group_assign_df)
                     remaining_df, best_assignment, best_total_cost = assign_relation_groups_optimal(
                         group_assign_df, relationship_group_dict, relationship_group_df_dict, selected_discrete_variable
@@ -1671,7 +1676,7 @@ with tabs[4]:
                 # 결과 병합 및 저장
                 final_group_assign_df = pd.concat(final_results, ignore_index=True)
                 st.session_state['final_group_assign_df'] = final_group_assign_df
-                #final_group_assign_df.to_excel('final_group_assign_df.xlsx', index=False)
+                final_group_assign_df.to_excel('final_group_assign_df.xlsx', index=False)
                 st.success("🎉 관계 기반 반 재배정이 완료되었습니다.")
                 # 관계 설정이 걸린 학생들 결과 확인
                 st.subheader("관계 설정이 적용된 학생들 결과 확인")
@@ -2187,6 +2192,7 @@ with tabs[7]:
     
     final_df = st.session_state['final_group_assign_df'].copy()
     final_df['초기그룹'] = final_df['초기그룹'] + 1
+    final_df.to_excel('디버깅용_final_df.xlsx', index=False) # 디버깅용
     selected_sort_variable_dict = st.session_state['selected_sort_variable_dict']
     # 그룹 번호순으로 나열
     ## 그룹 내 이름 가나다순 번호 부여
