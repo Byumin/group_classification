@@ -519,6 +519,12 @@ with tabs[0]:
             if st.button("결시생, 동명이인 라벨링"):
                 st.session_state['raw_df'] = merged_df
                 merged_df['결시생'] = merged_df['_merge'].apply(lambda x: 1 if x == 'left_only' else 0)
+                absent_student = merged_df['결시생']==1
+                merged_df.loc[absent_student, '학년반번호'] = (merged_df[absent_student]['학년'] + merged_df[absent_student]['임시반'] + merged_df[absent_student]['임시번호'])
+                merged_df['학년반번호'] = merged_df['학년반번호'].astype(float)
+                merged_df.loc[absent_student, '성별_검사결과'] = merged_df.loc[absent_student, '성별_명렬표']
+                merged_df.loc[absent_student, '이름_검사결과'] = merged_df.loc[absent_student, '이름_명렬표']
+                merged_df.loc[absent_student, '학교명'] = merged_df['학교명'].iloc[0] # 첫 번째 학생의 학교명
                 merged_df['동명이인'] = merged_df.duplicated('이름_명렬표', keep=False).astype(int)
                 merged_df['동명이인_ID'] = (
                     merged_df.groupby('이름_명렬표', sort=False).ngroup()
@@ -529,6 +535,7 @@ with tabs[0]:
                 st.dataframe(merged_df, use_container_width=True)
                 st.session_state['absent_merged_df'] = merged_df[merged_df['결시생'] == 1]
                 st.session_state['dup_names_merged_df'] = merged_df[merged_df['동명이인_ID'].notna()]
+                # merged_df.to_excel('결시생 학년반번호 추가 후.xlsx', index=False)
         else:
             pass
 
@@ -1445,7 +1452,7 @@ with tabs[3]:
             freq_df = (group_assign_df.groupby(groupby_cols)[existing_cols].sum().astype(int))
             st.markdown("##### 반 별 배정된 특이분류학생(특수학생, 전출예정, 운동부, 결시생 등) 현황")
             st.dataframe(freq_df.reset_index().assign(초기그룹=lambda x: x['초기그룹'] + 1), use_container_width=True, hide_index=True)
-            group_assign_df.to_excel('group_assign_df_초기반분류완료.xlsx', index=False) #! 초기 반 분류 완료 저장
+            # group_assign_df.to_excel('group_assign_df_초기반분류완료.xlsx', index=False) #! 초기 반 분류 완료 저장
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -1676,7 +1683,7 @@ with tabs[4]:
                 # 결과 병합 및 저장
                 final_group_assign_df = pd.concat(final_results, ignore_index=True)
                 st.session_state['final_group_assign_df'] = final_group_assign_df
-                final_group_assign_df.to_excel('final_group_assign_df.xlsx', index=False)
+                # final_group_assign_df.to_excel('final_group_assign_df.xlsx', index=False)
                 st.success("🎉 관계 기반 반 재배정이 완료되었습니다.")
                 # 관계 설정이 걸린 학생들 결과 확인
                 st.subheader("관계 설정이 적용된 학생들 결과 확인")
@@ -2192,7 +2199,7 @@ with tabs[7]:
     
     final_df = st.session_state['final_group_assign_df'].copy()
     final_df['초기그룹'] = final_df['초기그룹'] + 1
-    final_df.to_excel('디버깅용_final_df.xlsx', index=False) # 디버깅용
+    # final_df.to_excel('디버깅용_final_df.xlsx', index=False) # 디버깅용
     selected_sort_variable_dict = st.session_state['selected_sort_variable_dict']
     # 그룹 번호순으로 나열
     ## 그룹 내 이름 가나다순 번호 부여
