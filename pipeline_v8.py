@@ -17,7 +17,7 @@ def student_file_type_force(df):
         try:
             if col in ['학년', '임시반', '임시번호', '결시생', '운동부', '특수학생', '전출예정']:
                 df[col] = df[col].fillna(0)
-                df[col] = df[col].astype(int)
+                df[col] = df[col].astype(str)
             df[col] = df[col].astype(str)
         except:
             raise ValueError(f"명렬표의 '{col}' 열에서 데이터 타입 변환에 실패했습니다. 해당 열의 데이터를 확인해주세요.")
@@ -67,7 +67,7 @@ if existing_type in ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Typ
     # 두 검사 결과가 모두 업로드된 경우
     if student_file and uploaded_file_1 and uploaded_file_2:
         student_df = pd.read_excel(student_file)
-        student_file_type_force(student_df)
+        student_df = student_file_type_force(student_df) # 명렬표 파일 타입 강제 변환
         st.session_state['student_df'] = student_df
         raw_df_1 = pd.read_excel(uploaded_file_1)
         raw_df_2 = pd.read_excel(uploaded_file_2)
@@ -166,7 +166,7 @@ if existing_type in ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Typ
 
     elif student_file and uploaded_file_1 and not uploaded_file_2: # 검사 결과 파일 1만 업로드된 경우
         student_df = pd.read_excel(student_file)
-        student_file_type_force(student_df)
+        student_df = student_file_type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df = pd.read_excel(uploaded_file_1)
         if set(b_type_essential_cols) & set(raw_df.columns): # raw_df가 B타입인 경우
@@ -207,7 +207,7 @@ if existing_type in ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Typ
         st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
     elif student_file and not uploaded_file_1 and uploaded_file_2: # 검사 결과 파일 2만 업로드된 경우
         student_df = pd.read_excel(student_file)
-        student_file_type_force(student_df)
+        student_df = student_file_type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df = pd.read_excel(uploaded_file_2)
         if set(b_type_essential_cols) & set(raw_df.columns): # raw_df가 B타입인 경우
@@ -257,7 +257,7 @@ elif existing_type == 'Custom Type': # 커스텀 타입 선택 시
     # 두 검사 결과가 모두 업로드된 경우
     if student_file and uploaded_file_1 and uploaded_file_2:
         student_df = pd.read_excel(student_file)
-        student_file_type_force(student_df)
+        student_df = student_file_type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df_1 = pd.read_excel(uploaded_file_1)
         raw_df_2 = pd.read_excel(uploaded_file_2)
@@ -293,7 +293,7 @@ elif existing_type == 'Custom Type': # 커스텀 타입 선택 시
         st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
     elif student_file and uploaded_file_1 and not uploaded_file_2: # 검사 결과 파일 1만 업로드된 경우
         student_df = pd.read_excel(student_file)
-        student_file_type_force(student_df)
+        student_df = student_file_type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df = pd.read_excel(uploaded_file_1)
         raw_df['merge_key'] = raw_df['학년반번호'].astype(str) + raw_df['성별'].astype(str) + raw_df['이름'].astype(str)
@@ -302,7 +302,7 @@ elif existing_type == 'Custom Type': # 커스텀 타입 선택 시
         st.sidebar.success("파일이 성공적으로 업로드되었습니다.")
     elif student_file and not uploaded_file_1 and uploaded_file_2: # 검사 결과 파일 2만 업로드된 경우
         student_df = pd.read_excel(student_file)
-        student_file_type_force(student_df)
+        student_df = student_file_type_force(student_df)
         st.session_state['student_df'] = student_df
         raw_df = pd.read_excel(uploaded_file_2)
         raw_df['merge_key'] = raw_df['학년반번호'].astype(str) + raw_df['성별'].astype(str) + raw_df['이름'].astype(str)
@@ -469,6 +469,7 @@ with tabs[0]:
                 # 무조건 merge_key로 병합
                 merged_df = pd.merge(student_df, raw_df, on='merge_key', how='outer', indicator=True, suffixes=('_명렬표', '_검사결과'))
                 st.session_state['merged_df'] = merged_df
+                merged_df.to_excel("merged_df_test.xlsx", index=False) # 디버깅용
         else :
             st.error("검사 결과에만 있는 학생이 있습니다. 명렬표와 검사 결과를 다시 확인해주세요.")
         # 병합된 데이터프레임 기반으로 결시생, 동명이인(성+이름 동일) 처리
@@ -496,21 +497,21 @@ with tabs[0]:
             st.session_state['dup_names_merged_df'] = dup_names_merged_df
             # 특수학생 확인
             if '특수학생' in merged_df.columns:
-                special_student_df = merged_df[merged_df['특수학생'] == 1]
+                special_student_df = merged_df[merged_df['특수학생'] == '1']
                 st.write(f"특수학생 수 : {special_student_df.shape[0]}명")
                 st.dataframe(special_student_df, use_container_width=True)
             else:
                 st.info("명렬표에 특수학생 정보가 없어 생략됩니다.")
             # 운동부 확인
             if '운동부' in merged_df.columns:
-                athletic_student_df = merged_df[merged_df['운동부'] == 1]
+                athletic_student_df = merged_df[merged_df['운동부'] == '1']
                 st.write(f"운동부학생 수 : {athletic_student_df.shape[0]}명")
                 st.dataframe(athletic_student_df, use_container_width=True)
             else:
                 st.info("명렬표에 운동부학생 정보가 없어 생략됩니다.")
             # 전출예정학생 확인
             if '전출예정' in merged_df.columns:
-                transfer_student_df = merged_df[merged_df['전출예정'] == 1]
+                transfer_student_df = merged_df[merged_df['전출예정'] == '1']
                 st.write(f"전출예정학생 수 : {transfer_student_df.shape[0]}명")
                 st.dataframe(transfer_student_df, use_container_width=True)
             else:
@@ -904,8 +905,8 @@ with tabs[3]:
                                 continue
                             else: ## 분리할 컬럼이 있는 경우
                                 print(f"  Splitting based on column: {rule_info['flag_col']}")
-                                df[rule_info['flag_col']] = df[rule_info['flag_col']].astype(int) # 혹시 몰라 형변환(문자열 처리된 경우 대비)
-                                source_df = df[df[rule_info['flag_col']] == 1].copy() ## 분리한 기준 컬럼으로 '1'인 행 분리
+                                df[rule_info['flag_col']] = df[rule_info['flag_col']].astype(str) # 혹시 몰라 형변환(문자열 처리된 경우 대비)
+                                source_df = df[df[rule_info['flag_col']] == '1'].copy() ## 분리한 기준 컬럼으로 '1'인 행 분리
                                 st.session_state[rule_info['save_session_key']] = source_df
                         # 중복 방지, 앞에서 분리된 학생 제외 처리
                         for prev_rule in split_df_rules:
