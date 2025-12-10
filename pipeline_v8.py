@@ -17,8 +17,7 @@ def student_file_type_force(df):
         try:
             if col in ['학년', '임시반', '임시번호', '결시생', '운동부', '특수학생', '전출예정']:
                 df[col] = df[col].fillna(0)
-                df[col] = df[col].astype(str)
-            df[col] = df[col].astype(str)
+                df[col] = df[col].astype(int).astype(str)
         except:
             raise ValueError(f"명렬표의 '{col}' 열에서 데이터 타입 변환에 실패했습니다. 해당 열의 데이터를 확인해주세요.")
     return df
@@ -469,7 +468,7 @@ with tabs[0]:
                 # 무조건 merge_key로 병합
                 merged_df = pd.merge(student_df, raw_df, on='merge_key', how='outer', indicator=True, suffixes=('_명렬표', '_검사결과'))
                 st.session_state['merged_df'] = merged_df
-                merged_df.to_excel("merged_df_test.xlsx", index=False) # 디버깅용
+                # merged_df.to_excel("merged_df_test.xlsx", index=False) # 디버깅용
         else :
             st.error("검사 결과에만 있는 학생이 있습니다. 명렬표와 검사 결과를 다시 확인해주세요.")
         # 병합된 데이터프레임 기반으로 결시생, 동명이인(성+이름 동일) 처리
@@ -1663,6 +1662,11 @@ with tabs[4]:
                         target_n_groups=group_assign_df['초기그룹'].nunique(),
                         verbose=True
                     )
+                    with open("relation_groups.txt", "w", encoding="utf-8") as f:
+                        for g in groups:
+                            f.write(str(g) + "\n")
+                        f.write(f"타깃 그룹 수: {group_assign_df['초기그룹'].nunique()}\n")
+                        f.write(f"관계 딕셔너리: {relationship_dict}\n")
                     relationship_group_dict, relationship_group_df_dict = relation_groups_to_dict(groups, group_assign_df)
                     remaining_df, best_assignment, best_total_cost = assign_relation_groups_optimal(
                         group_assign_df, relationship_group_dict, relationship_group_df_dict, selected_discrete_variable
@@ -1783,7 +1787,7 @@ with tabs[5]:
     # -------------------------------------------------------------
     # ② 그룹별 연속형 변수 평균 시각화
     # -------------------------------------------------------------
-    st.markdown("### 📈 그룹별 연속형 변수 평균")
+    st.markdown("### 📈 반 별 연속형 변수 평균")
 
     if not continuous_vars:
         st.info("연속형 변수가 없습니다.")
@@ -2312,7 +2316,7 @@ with tabs[7]:
                 template_cols.insert(insert_idx, '선택과목')
         available_cols = [col for col in template_cols if col in df.columns]
         df_filtered = df[available_cols]
-        
+
         for r_idx, row in enumerate(dataframe_to_rows(df_filtered, index=False, header=False), 2):
             for c_idx, value in enumerate(row, 1):
                 cell = ws.cell(row=r_idx, column=c_idx, value=value)
