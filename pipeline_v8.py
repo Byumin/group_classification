@@ -581,7 +581,10 @@ with tabs[1]:
                 formula = available_calculations.get(var_info['formula'], None)
                 try:
                     if formula == 'sum':
-                        df[var_name] = df[variables].sum(axis=1)
+                        # 들어가는 변수가 전부 nan인 경우 -> 결과도 nan 처리 (그렇지 않으면 0으로 처리되어 문제가 생김)
+                        df_nan_mask = df[variables].isna().all(axis=1) # 모든 선택된 변수가 nan인 행 마스크
+                        df.loc[df_nan_mask, var_name] = np.nan
+                        df.loc[~df_nan_mask, var_name] = df.loc[~df_nan_mask, variables].sum(axis=1)
                     elif formula == 'mean':
                         df[var_name] = df[variables].mean(axis=1)
                     elif formula == 'median':
@@ -615,7 +618,7 @@ with tabs[1]:
         available_discrete_variables = st.session_state['discrete_variable']
         st.session_state['available_discrete_variables'] = available_discrete_variables
         # 데이터프레임 표시
-        st.dataframe(df.head(10), use_container_width=True)
+        st.dataframe(df.head(20), use_container_width=True)
     elif 'created_variables_flag' not in st.session_state or not st.session_state['created_variables_flag']: # 변수 생성 버튼이 눌리지 않은 경우 -> streamlit 구조상 버튼 누르고 탭 변경시 초기화되어 else 조건 처리가 됨
         # 기존 사이드바에서 선택한 변수 그래도 df
         # 반 편성 기준 연속형 변수 가지고오기
@@ -889,7 +892,7 @@ with tabs[3]:
                             st.session_state[rule_info['save_session_key']] = pd.DataFrame()
                             st.warning(f"명렬표에 {rule_info['flag_col']} 정보가 없어 생략됩니다.")
                             continue
-                        # 외부 세션 참조 여부 확인
+                        # 외부 세션 참조 여부 확인 (결시생만 외부 세션에서 불러옴)
                         if rule_info['external']:
                             print("  Using external session data for splitting.")
                             ## 외부에서 분리된 데이터프레임 불러오기
