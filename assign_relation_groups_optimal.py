@@ -57,75 +57,36 @@ def find_relation_groups_minimal(relation_dict, max_iter=10, target_n_groups=Non
                 subgroups.append(set([student]))
         refined_groups.extend(subgroups)
 
-    # Step 3️⃣ 작은 그룹끼리 순차 병합
-    groups = copy.deepcopy(refined_groups)
+    # refined_groups를 크기 내림차순으로 정렬
+    refined_groups = sorted(refined_groups, key=lambda x: -len(x))
 
-    def has_conflict(g1, g2):
-        """두 그룹 사이에 -1 관계가 있으면 True"""
-        for a in g1:
-            for b in g2:
-                if relation_dict.get(a, {}).get(b) == -1 or relation_dict.get(b, {}).get(a) == -1:
-                    return True
-        return False
+    # target_n_groups만큼 빈 그룹 생성
+    groups = [set() for _ in range(target_n_groups)]
 
-    for iteration in range(max_iter):
-        # 그룹을 크기 오름차순으로 정렬
-        groups.sort(key=len)
+    # 각 refined_group 배치
+    for rg in refined_groups:
 
-        # 병합이 불가능하거나 그룹 수가 목표 이하이면 중단
-        if target_n_groups and len(groups) <= target_n_groups:
-            if verbose:
-                print(f"✅ Iter {iteration+1}: 목표 그룹 수({target_n_groups}) 이하로 도달하여 중단합니다.")
-            break
-        if len(groups) < 2:
-            if verbose:
-                print("✅ 병합 가능한 그룹이 1개 이하입니다. 중단합니다.")
-            break
+        candidate_indices = []
 
-        merged = False
-        new_groups = []
-        used = set()
+        for gi in range(target_n_groups):
+            g = groups[gi]
+            conflict = False
 
-        # 작은 그룹 2개만 병합
-        for i in range(len(groups)):
-            if i in used:
-                continue
-            g1 = groups[i]
-            # 다음으로 작은 그룹 찾아서 병합 시도
-            for j in range(i+1, len(groups)):
-                if j in used:
-                    continue
-                g2 = groups[j]
-                if not has_conflict(g1, g2):
-                    # 병합 수행
-                    merged_group = g1 | g2
-                    new_groups.append(merged_group)
-                    used.update([i, j])
-                    merged = True
+            # 충돌 검사: g에 있는 학생과 rg의 학생이 -1 관계인지 검사
+            for student in rg:
+                if any((other in graph_neg[student]) for other in g):
+                    conflict = True
                     break
-            else:
-                # 병합 대상이 없으면 그대로 유지
-                if i not in used:
-                    new_groups.append(g1)
 
-            # 한 번 병합했으면 이번 iteration은 종료 (2개만 병합)
-            if merged:
-                break
+            if not conflict:
+                candidate_indices.append(gi)
+        # 어떤 그룹에도 넣을 수 없을 경우 -> 오류 반환
+        if not candidate_indices:
+            raise ValueError(f"[오류] 관계그룹 {rg} 는 어떤 대상 그룹에도 배정될 수 없습니다. 관계 조건을 완화하거나, 반 개수를 늘려주세요.")
 
-        # 병합 안 된 나머지 그룹 유지
-        for k in range(len(groups)):
-            if k not in used and groups[k] not in new_groups:
-                new_groups.append(groups[k])
-
-        groups = new_groups
-
-        if verbose:
-            print(f"🌀 Iter {iteration+1}: 그룹 수 = {len(groups)}")
-
-        if not merged:
-            if verbose:
-                print("✅ 더 이상 병합 가능한 그룹이 없어 중단합니다.")
-            break
+        # 충돌 없으면: 가장 학생 수가 적은 그룹 선택
+        best_group_idx = min(candidate_indices, key=lambda gi: len(groups[gi]))
+        groups[best_group_idx].update(rg)
 
     return groups
 
