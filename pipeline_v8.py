@@ -581,7 +581,10 @@ with tabs[1]:
                 formula = available_calculations.get(var_info['formula'], None)
                 try:
                     if formula == 'sum':
-                        df[var_name] = df[variables].sum(axis=1)
+                        # 들어가는 변수가 전부 nan인 경우 -> 결과도 nan 처리 (그렇지 않으면 0으로 처리되어 문제가 생김)
+                        df_nan_mask = df[variables].isna().all(axis=1) # 모든 선택된 변수가 nan인 행 마스크
+                        df.loc[df_nan_mask, var_name] = np.nan
+                        df.loc[~df_nan_mask, var_name] = df.loc[~df_nan_mask, variables].sum(axis=1)
                     elif formula == 'mean':
                         df[var_name] = df[variables].mean(axis=1)
                     elif formula == 'median':
@@ -615,7 +618,7 @@ with tabs[1]:
         available_discrete_variables = st.session_state['discrete_variable']
         st.session_state['available_discrete_variables'] = available_discrete_variables
         # 데이터프레임 표시
-        st.dataframe(df.head(10), use_container_width=True)
+        st.dataframe(df.head(20), use_container_width=True)
     elif 'created_variables_flag' not in st.session_state or not st.session_state['created_variables_flag']: # 변수 생성 버튼이 눌리지 않은 경우 -> streamlit 구조상 버튼 누르고 탭 변경시 초기화되어 else 조건 처리가 됨
         # 기존 사이드바에서 선택한 변수 그래도 df
         # 반 편성 기준 연속형 변수 가지고오기
@@ -889,7 +892,7 @@ with tabs[3]:
                             st.session_state[rule_info['save_session_key']] = pd.DataFrame()
                             st.warning(f"명렬표에 {rule_info['flag_col']} 정보가 없어 생략됩니다.")
                             continue
-                        # 외부 세션 참조 여부 확인
+                        # 외부 세션 참조 여부 확인 (결시생만 외부 세션에서 불러옴)
                         if rule_info['external']:
                             print("  Using external session data for splitting.")
                             ## 외부에서 분리된 데이터프레임 불러오기
@@ -1801,6 +1804,11 @@ with tabs[5]:
 with tabs[6]:
     import plotly.express as px
     import plotly.graph_objects as go
+    # 반 번호 포맷 함수
+    def format_group_no(x):
+        if x == '전체':
+            return '전체'
+        return f"{int(x)+1}"
     if 'final_group_assign_df' not in st.session_state:
         st.warning("⚠️ 아직 관계 배정이 완료되지 않았습니다. 학생 관계 재배정 탭에서 동명이인 처리 및 관계 배정을 먼저 진행해주세요.")
         st.stop()
@@ -1816,14 +1824,23 @@ with tabs[6]:
         selected_discrete_variable = ['성별_명렬표' if var == '성별' else var for var in selected_discrete_variable]
         selected_sort_variable = st.session_state.get('selected_sort_variable_dict', {}).keys()
         # 이동할 그룹 선택
-        source_group_no = st.selectbox("이동시킬 반 선택", list(map(int, sorted(df['초기그룹'].unique().tolist()))))
-        # 해당 그룹의 학생들만 필터링
-        source_group_df = df[df['초기그룹'] == source_group_no]
-        st.dataframe(source_group_df[['이름_명렬표']+selected_discrete_variable+list(selected_sort_variable)], use_container_width=True)
+        group_list = ['전체'] + list(map(int, sorted(df['초기그룹'].unique().tolist())))
+        source_group_no = st.selectbox("이동시킬 반 선택", group_list, format_func=format_group_no, index=0)
+        # 학생이 속해있는 그룹의 데이터 프레임
+        if source_group_no == "전체":
+            # 검색한 학생의 속한 그룹만 필터링
+            filtered_students = df.copy() # 전체 학생
+        # 출발 그룹이 지정된 경우
+        else:
+            filtered_students = df[df['초기그룹'] == source_group_no] # 해당 그룹 학생
         # 이동할 학생 선택
-        selected_student = st.selectbox(f"{source_group_no}번 그룹에서 이동할 학생 선택", sorted(source_group_df['merge_key'].unique().tolist()))
-        # 선택한 학생의 필터링된 그룹 리스트 생성
-        ## 케이스별 groupby 기준 설정
+        selected_student = st.selectbox(f"이동시킬 학생 선택", sorted(filtered_students['merge_key'].unique().tolist()))
+        selected_student_group_no = df[df['merge_key'] == selected_student]['초기그룹'].values[0]
+        filtered_students = df[df['초기그룹'] == selected_student_group_no] # 선택한 학생이 속한 그룹으로 필터링
+        st.write(f"선택한 학생이 속한 {format_group_no(selected_student_group_no)}반 학생 목록") # 1부터 시작하는 반 번호 표시
+        # 선택한 학생이 속한 그룹의 학생들
+        st.dataframe(filtered_students[['이름_명렬표']+selected_discrete_variable+list(selected_sort_variable)], use_container_width=True)
+        ## 케이스별 groupby 기준 설정 -> 이동할 수 있는 대상 그룹 파악용
         if final_sex_choice == '분반' and final_subject_choice == '예':
             groupby_cols = ['성별_명렬표', '선택과목']
         elif final_sex_choice == '분반' and final_subject_choice == '아니오':
@@ -1848,18 +1865,24 @@ with tabs[6]:
             candidate_groups_df = all_group_df.get_group(group_keys)
             # 선택한 학생이 속한 그룹 제외
             exception_candidate_groups = candidate_groups_df.loc[candidate_groups_df['초기그룹'] != selected_row['초기그룹'], '초기그룹'].unique().tolist()
-            exception_candidate_groups = [int(g_n) for g_n in exception_candidate_groups]
+            exception_candidate_groups = [int(g_n) for g_n in exception_candidate_groups]# 정수처리
         else:
+            # 전체 그룹에서 선택한 학생이 속한 그룹 제외
             exception_candidate_groups = df.loc[df['초기그룹'] != selected_row['초기그룹'], '초기그룹'].unique().tolist()
             exception_candidate_groups = [int(g_n) for g_n in exception_candidate_groups]
         current_group = int(df.loc[df['merge_key'] == selected_student, '초기그룹'].values[0]) # 출발 그룹 번호
-        target_group = st.selectbox("이동할 대상 반 선택", sorted(exception_candidate_groups)) # 도착할 그룹 선택 -> 도착 그룹 번호
+        target_group = st.selectbox("이동할 대상 반 선택", sorted(exception_candidate_groups), format_func=format_group_no) # 도착할 그룹 선택 -> 도착 그룹 번호
         # 가상 이동 수행
-        sim_df = df.copy(deep=True)
+        ## 가성 이동 수행할 이동 전 df와 이동 후 df 생성
+        sim_df = df.copy(deep=True) # 이동 후 시뮬레이션 데이터프레임
         sim_df.loc[sim_df['merge_key'] == selected_student, '초기그룹'] = target_group
         # 이동 전후 평균 비교
-        before_mean = df.groupby('초기그룹')[selected_continuous].mean().reset_index().rename(columns={selected_continuous: '이동 전'})
-        after_mean = sim_df.groupby('초기그룹')[selected_continuous].mean().reset_index().rename(columns={selected_continuous: '이동 후'})
+        before_mean = df.groupby('초기그룹')[selected_continuous].mean().reset_index().rename(columns={selected_continuous: '이동 전'}) # 딕셔너리 형태
+        before_mean['초기그룹'] = before_mean['초기그룹'].apply(format_group_no) # 반 번호 포맷 적용
+        before_mean = before_mean.sort_values('초기그룹')
+        after_mean = sim_df.groupby('초기그룹')[selected_continuous].mean().reset_index().rename(columns={selected_continuous: '이동 후'}) # 딕셔너리 형태
+        after_mean['초기그룹'] = after_mean['초기그룹'].apply(format_group_no) # 반 번호 포맷 적용
+        after_mean = after_mean.sort_values('초기그룹')
         compare_mean = pd.merge(before_mean, after_mean, on='초기그룹', how='outer')
         st.markdown("#### 이동 전후 평균 비교")
         fig_compare = go.Figure()
@@ -1901,7 +1924,10 @@ with tabs[6]:
                     title=f"📊 {selected_discrete_for_sim} - 이동 전후 누적빈도 비교",
                     color_discrete_sequence=['#4C78A8', '#F58518', '#E45756', '#72B7B2', '#54A24B']
                 )
-                # 🔥 강조 처리 (이동 출발 / 대상 그룹)
+                # x축 라벨을 1부터 시작하는 반 번호로 변경
+                unique_x = sorted(freq_melted['초기그룹'].unique())
+                fig_stacked.update_xaxes(tickvals=unique_x, ticktext=[format_group_no(x) for x in unique_x])
+                # 강조 처리 (이동 출발 / 대상 그룹)
                 for trace in fig_stacked.data:
                     opacities = [1.0 if x in highlight_groups else 0.3 for x in trace.x]
                     trace.marker.opacity = opacities
@@ -1918,7 +1944,7 @@ with tabs[6]:
                         dict(
                             x=current_group,
                             y=0,
-                            text="⬆ 이동 출발",
+                            text="",
                             showarrow=False,
                             yshift=10,
                             font=dict(color="red", size=12)
@@ -1926,7 +1952,7 @@ with tabs[6]:
                         dict(
                             x=target_group,
                             y=0,
-                            text="⬆ 이동 대상",
+                            text="",
                             showarrow=False,
                             yshift=10,
                             font=dict(color="red", size=12)
@@ -1940,7 +1966,7 @@ with tabs[6]:
             if st.button("✅ 변경 적용"):
                 st.session_state['final_group_assign_df'] = sim_df
                 #sim_df.to_excel('final_group_assign_df_수동이동적용.xlsx', index=False)
-                st.success(f"학생 {selected_student}이(가) {current_group} → {target_group} 반으로 이동이 적용되었습니다.")
+                st.success(f"학생 {selected_student}이(가) {current_group+1} → {target_group+1} 반으로 이동이 적용되었습니다.")
 
         with col2:
             if st.button("↩️ 변경 취소"):
@@ -1956,13 +1982,22 @@ with tabs[6]:
         selected_discrete_variable = ['성별_명렬표' if var == '성별' else var for var in selected_discrete_variable]
         selected_sort_variable = st.session_state.get('selected_sort_variable_dict', {}).keys()
         # 이동할 그룹 선택
-        source_group_no = st.selectbox("이동시킬 반 선택", list(map(int, sorted(df['초기그룹'].unique().tolist()))))
-        # 해당 그룹의 학생들만 필터링
-        source_group_df = df[df['초기그룹'] == source_group_no]
-        st.dataframe(source_group_df[['이름_명렬표']+selected_discrete_variable+list(selected_sort_variable)], use_container_width=True)
-        # 이동할 학생 선택
-        selected_student = st.selectbox(f"{source_group_no}번 반에서 이동할 학생 선택", sorted(source_group_df['merge_key'].unique().tolist()))
-        # 선택한 학생의 필터링된 그룹 리스트 생성
+        group_list = ['전체'] + list(map(int, sorted(df['초기그룹'].unique().tolist())))
+        source_group_no = st.selectbox("이동시킬 반 선택", group_list, format_func=format_group_no, index=0)
+        # 학생이 속해있는 그룹의 데이터 프레임
+        if source_group_no == "전체":
+            # 검색한 학생의 속한 그룹만 필터링
+            filtered_students = df.copy() # 전체 학생
+        # 출발 그룹이 지정된 경우
+        else:
+            filtered_students = df[df['초기그룹'] == source_group_no] # 해당 그룹 학생
+        # 교환할 학생 선택
+        selected_student = st.selectbox(f"{source_group_no}번 반에서 이동할 학생 선택", sorted(filtered_students['merge_key'].unique().tolist()))
+        selected_student_group_no = df[df['merge_key'] == selected_student]['초기그룹'].values[0]
+        filtered_students = df[df['초기그룹'] == selected_student_group_no] # 선택한 학생이 속한 그룹으로 필터링
+        st.write(f"선택한 학생이 속한 {format_group_no(selected_student_group_no)}반 학생 목록") # 1부터 시작하는 반 번호 표시
+        # 선택한 학생이 속한 그룹의 학생들
+        st.dataframe(filtered_students[['이름_명렬표']+selected_discrete_variable+list(selected_sort_variable)], use_container_width=True)
         ## 케이스별 groupby 기준 설정
         if final_sex_choice == '분반' and final_subject_choice == '예':
             groupby_cols = ['성별_명렬표', '선택과목']
@@ -1993,7 +2028,7 @@ with tabs[6]:
             exception_candidate_groups = df.loc[df['초기그룹'] != selected_row['초기그룹'], '초기그룹'].unique().tolist()
             exception_candidate_groups = [int(g_n) for g_n in exception_candidate_groups]
         current_group = int(df.loc[df['merge_key'] == selected_student, '초기그룹'].values[0]) # 출발 그룹 번호
-        target_group = st.selectbox("이동할 대상 반 선택", sorted(exception_candidate_groups)) # 도착할 그룹 선택 -> 도착 그룹 번호
+        target_group = st.selectbox("이동할 대상 반 선택", sorted(exception_candidate_groups), format_func=format_group_no) # 도착할 그룹 선택 -> 도착 그룹 번호
         # 유사도 판단용 변수 선택
         selected_discrete_for_swap = st.multiselect("교환 유사도 판단용 이산형 변수 선택", selected_discrete_variable, default=selected_discrete_variable)
         selected_continuous_for_swap = st.multiselect("교환 유사도 판단용 연속형 변수 선택", continuous_variable, default=continuous_variable)
@@ -2041,10 +2076,14 @@ with tabs[6]:
                 df.groupby('초기그룹')[visualize_continuous_variables]
                 .mean().reset_index().rename(columns={visualize_continuous_variables: '교환 전'})
             )
+            before_mean['초기그룹'] = before_mean['초기그룹'].apply(format_group_no) # 반 번호 포맷 적용
+            before_mean = before_mean.sort_values('초기그룹')
             after_mean = (
                 sim_df.groupby('초기그룹')[visualize_continuous_variables]
                 .mean().reset_index().rename(columns={visualize_continuous_variables: '교환 후'})
             )
+            after_mean['초기그룹'] = after_mean['초기그룹'].apply(format_group_no) # 반 번호 포맷 적용
+            after_mean = after_mean.sort_values('초기그룹')
             compare_mean = pd.merge(before_mean, after_mean, on='초기그룹', how='outer')
             
             st.markdown("#### 📊 교환 전후 평균 비교")
@@ -2097,6 +2136,9 @@ with tabs[6]:
                     title=f"{selected_discrete_for_sim} - 교환 전후 누적빈도 비교",
                     color_discrete_sequence=['#4C78A8', '#F58518', '#E45756', '#72B7B2', '#54A24B']
                 )
+                # x축 라벨을 1부터 시작하는 반 번호로 변경
+                unique_x = sorted(freq_melted['초기그룹'].unique())
+                fig_stacked.update_xaxes(tickvals=unique_x, ticktext=[format_group_no(x) for x in unique_x])
                 # 강조 처리
                 for trace in fig_stacked.data:
                     opacities = [1.0 if x in highlight_groups else 0.3 for x in trace.x]
@@ -2108,9 +2150,9 @@ with tabs[6]:
                     legend_title=selected_discrete_for_sim,
                     margin=dict(t=50, b=40, l=40, r=40),
                     annotations=[
-                        dict(x=current_group, y=0, text="⬆ 교환 출발", showarrow=False,
+                        dict(x=current_group, y=0, text="", showarrow=False,
                             yshift=10, font=dict(color="red", size=12)),
-                        dict(x=target_group, y=0, text="⬆ 교환 대상", showarrow=False,
+                        dict(x=target_group, y=0, text="", showarrow=False,
                             yshift=10, font=dict(color="red", size=12))
                     ]
                 )
@@ -2120,7 +2162,7 @@ with tabs[6]:
             if st.button("✅ 변경 적용"):
                 st.session_state['final_group_assign_df'] = sim_df
                 #sim_df.to_excel('final_group_assign_df_수동교환적용.xlsx', index=False)
-                st.success(f"학생 {selected_student}이(가) {current_group} ↔ {target_group} 반으로 교환이 적용되었습니다.")
+                st.success(f"학생 {selected_student}이(가) {current_group+1} ↔ {target_group+1} 반으로 교환이 적용되었습니다.")
         with col2:
             if st.button("↩️ 변경 취소"):
                 st.session_state['final_group_assign_df'] = df
