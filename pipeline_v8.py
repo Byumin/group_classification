@@ -527,7 +527,7 @@ with tabs[0]:
                 merged_df['학년반번호'] = merged_df['학년반번호'].astype(float)
                 merged_df.loc[absent_student, '성별_검사결과'] = merged_df.loc[absent_student, '성별_명렬표']
                 merged_df.loc[absent_student, '이름_검사결과'] = merged_df.loc[absent_student, '이름_명렬표']
-                merged_df.loc[absent_student, '학교명'] = merged_df['학교명'].iloc[0] # 첫 번째 학생의 학교명
+                merged_df.loc[absent_student, '학교명'] = merged_df.loc[merged_df['학교명'].notna(), '학교명'].iloc[0] # 학교명이 비어있지 않은 첫 번째 학생의 학교명
                 merged_df['동명이인'] = merged_df.duplicated('이름_명렬표', keep=False).astype(int)
                 merged_df['동명이인_ID'] = (
                     merged_df.groupby('이름_명렬표', sort=False).ngroup()
@@ -1455,7 +1455,7 @@ with tabs[3]:
             freq_df = (group_assign_df.groupby(groupby_cols)[existing_cols].sum().astype(int))
             st.markdown("##### 반 별 배정된 특이분류학생(특수학생, 전출예정, 운동부, 결시생 등) 현황")
             st.dataframe(freq_df.reset_index().assign(초기그룹=lambda x: x['초기그룹'] + 1), use_container_width=True, hide_index=True)
-            group_assign_df.to_excel('group_assign_df_초기반분류완료.xlsx', index=False) #! 초기 반 분류 완료 저장
+            # group_assign_df.to_excel('group_assign_df_초기반분류완료.xlsx', index=False) #! 초기 반 분류 완료 저장
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -1665,11 +1665,11 @@ with tabs[4]:
                         target_n_groups=group_assign_df['초기그룹'].nunique(),
                         verbose=True
                     )
-                    with open("relation_groups.txt", "w", encoding="utf-8") as f:
-                        for g in groups:
-                            f.write(str(g) + "\n")
-                        f.write(f"타깃 그룹 수: {group_assign_df['초기그룹'].nunique()}\n")
-                        f.write(f"관계 딕셔너리: {relationship_dict}\n")
+                    # with open("relation_groups.txt", "w", encoding="utf-8") as f:
+                    #     for g in groups:
+                    #         f.write(str(g) + "\n")
+                    #     f.write(f"타깃 그룹 수: {group_assign_df['초기그룹'].nunique()}\n")
+                    #     f.write(f"관계 딕셔너리: {relationship_dict}\n")
                     relationship_group_dict, relationship_group_df_dict = relation_groups_to_dict(groups, group_assign_df)
                     remaining_df, best_assignment, best_total_cost = assign_relation_groups_optimal(
                         group_assign_df, relationship_group_dict, relationship_group_df_dict, selected_discrete_variable
