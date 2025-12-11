@@ -297,7 +297,6 @@ def merge_optimal_assignments(remaining_df, best_assignment, relationship_group_
 
     # 원본 복사
     final_df = deepcopy(remaining_df)
-    final_df["그룹고정"] = False  # 관계그룹 병합 후에도 고정 여부 컬럼 유지
 
     # 각 관계그룹을 배정 결과에 따라 병합
     for rel_name, target_group in best_assignment.items():

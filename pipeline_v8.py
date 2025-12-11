@@ -3,7 +3,10 @@ import pandas as pd
 import numpy as np # xlsxwriter 설치 필요 (다른 환경에서)
 import traceback
 import io
-
+# 로그 함수만
+def log(msg: str):
+    with open("special_assign_log.txt", "a", encoding="utf-8") as f:
+        f.write(msg + "\n")
 st.set_page_config(page_title="반 편성", layout="wide")
 # 사이드바 메뉴
 st.sidebar.title("업로드 및 설정")
@@ -518,8 +521,8 @@ with tabs[0]:
             # 확인한 결시생과 동명이인이 맞다면 클릭
             if st.button("결시생, 동명이인 라벨링"):
                 st.session_state['raw_df'] = merged_df
-                merged_df['결시생'] = merged_df['_merge'].apply(lambda x: 1 if x == 'left_only' else 0)
-                absent_student = merged_df['결시생']==1
+                merged_df['결시생'] = merged_df['_merge'].apply(lambda x: '1' if x == 'left_only' else '0')
+                absent_student = merged_df['결시생']=='1'
                 merged_df.loc[absent_student, '학년반번호'] = (merged_df[absent_student]['학년'] + merged_df[absent_student]['임시반'] + merged_df[absent_student]['임시번호'])
                 merged_df['학년반번호'] = merged_df['학년반번호'].astype(float)
                 merged_df.loc[absent_student, '성별_검사결과'] = merged_df.loc[absent_student, '성별_명렬표']
@@ -533,7 +536,7 @@ with tabs[0]:
                 st.session_state['merged_df'] = merged_df
                 st.success("결시생, 동명이인 라벨링이 완료되었습니다. 변수 생성을 진행해주세요.")
                 st.dataframe(merged_df, use_container_width=True)
-                st.session_state['absent_merged_df'] = merged_df[merged_df['결시생'] == 1]
+                st.session_state['absent_merged_df'] = merged_df[merged_df['결시생'] == '1']
                 st.session_state['dup_names_merged_df'] = merged_df[merged_df['동명이인_ID'].notna()]
                 # merged_df.to_excel('결시생 학년반번호 추가 후.xlsx', index=False)
         else:
@@ -1160,7 +1163,7 @@ with tabs[3]:
                         group_assign_df = pd.concat(special_assign_results, axis=0)
                         st.session_state['group_assign_df'] = group_assign_df
                         st.success("특수학생 균등 배정이 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
-                        #group_assign_df.to_excel('group_assign_df_특수학생배정완료.xlsx', index=False) #! 특수학생 배정 저장
+                        # group_assign_df.to_excel('group_assign_df_특수학생배정완료.xlsx', index=False) #! 특수학생 배정 저장
                     elif groupby_cols == []: # 전체 그룹 대상으로 균등 배정
                         group_counts = group_assign_df['초기그룹'].value_counts().to_dict() # groupby된 데이터프레임에서 그룹별 인원수 파악
                         g_idx = 0
@@ -1242,7 +1245,7 @@ with tabs[3]:
                         group_assign_df = pd.concat(transfer_assign_results, axis=0)
                         st.session_state['group_assign_df'] = group_assign_df
                         st.success("전출학생 균등 배정이 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
-                        #group_assign_df.to_excel('group_assign_df_전출학생배정완료.xlsx', index=False) #! 전출학생 배정 저장
+                        # group_assign_df.to_excel('group_assign_df_전출학생배정완료.xlsx', index=False) #! 전출학생 배정 저장
                     elif groupby_cols == []: # 전체 그룹 대상으로 균등 배정
                         group_counts = group_assign_df['초기그룹'].value_counts().to_dict() # groupby된 데이터프레임에서 그룹별 인원수 파악
                         g_idx = 0
@@ -1323,7 +1326,7 @@ with tabs[3]:
                         group_assign_df = pd.concat(athlete_assign_results, axis=0)
                         st.session_state['group_assign_df'] = group_assign_df
                         st.success("운동부 균등 배정이 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
-                        #group_assign_df.to_excel('group_assign_df_운동부배정완료.xlsx', index=False) #! 운동부 배정 저장
+                        # group_assign_df.to_excel('group_assign_df_운동부배정완료.xlsx', index=False) #! 운동부 배정 저장
                     elif groupby_cols == []: # 전체 그룹 대상으로 균등 배정
                         group_counts = group_assign_df['초기그룹'].value_counts().to_dict() # groupby된 데이터프레임에서 그룹별 인원수 파악
                         g_idx = 0
@@ -1407,7 +1410,7 @@ with tabs[3]:
                         group_assign_df = pd.concat(absent_assign_results, axis=0)
                         st.session_state['group_assign_df'] = group_assign_df
                         st.success("결시생 균등 배정이 완료되었습니다. 분류 후 분포 확인 탭에서 결과를 확인하세요.")
-                        #group_assign_df.to_excel('group_assign_df_결시생배정완료.xlsx', index=False) #! 결시생 배정 저장
+                        # group_assign_df.to_excel('group_assign_df_결시생배정완료.xlsx', index=False) #! 결시생 배정 저장
                     elif groupby_cols == []: # 전체 그룹 대상으로 균등 배정
                         group_counts = group_assign_df['초기그룹'].value_counts().to_dict() # groupby된 데이터프레임에서 그룹별 인원수 파악
                         g_idx = 0
@@ -1452,7 +1455,7 @@ with tabs[3]:
             freq_df = (group_assign_df.groupby(groupby_cols)[existing_cols].sum().astype(int))
             st.markdown("##### 반 별 배정된 특이분류학생(특수학생, 전출예정, 운동부, 결시생 등) 현황")
             st.dataframe(freq_df.reset_index().assign(초기그룹=lambda x: x['초기그룹'] + 1), use_container_width=True, hide_index=True)
-            # group_assign_df.to_excel('group_assign_df_초기반분류완료.xlsx', index=False) #! 초기 반 분류 완료 저장
+            group_assign_df.to_excel('group_assign_df_초기반분류완료.xlsx', index=False) #! 초기 반 분류 완료 저장
         except Exception as e:
             import traceback
             traceback.print_exc()
