@@ -261,7 +261,7 @@ with tabs[2]:
                             x=x_vals,
                             y=y_scaled,
                             mode="lines",
-                            line=dict(color="lightblue", width=2),
+                            line=dict(color="lightblue", use_container_width=2),
                             fill='tozeroy',
                             fillcolor='rgba(0,0,1,0.2)',
                             showlegend=False
@@ -292,7 +292,7 @@ with tabs[2]:
                             x=freq_df[var],
                             y=freq_df['count'],
                             marker_color=colors,
-                            width=[0.4] * len(freq_df), # 막대 너비 설정
+                            use_container_width=[0.4] * len(freq_df), # 막대 너비 설정
                         )
                     )
                     fig.update_layout(
@@ -476,7 +476,7 @@ with tabs[4]:
                 x_vals = np.linspace(group_data.min(), group_data.max(), 200)
                 y_vals = kde(x_vals)
 
-                # bin-width 기반 스케일 보정
+                # bin-use_container_width 기반 스케일 보정
                 counts, bins = np.histogram(group_data, bins='auto')
                 bin_width = bins[1] - bins[0]
                 y_scaled = y_vals * len(group_data) * bin_width
@@ -487,7 +487,7 @@ with tabs[4]:
                         y=y_scaled,
                         mode='lines',
                         name=f'{group} KDE',
-                        line=dict(color=colors[i % len(colors)], width=2),
+                        line=dict(color=colors[i % len(colors)], use_container_width=2),
                         opacity=0.7,
                         showlegend=False  # KDE는 범례에서 제외하고 싶을 경우
                     )
