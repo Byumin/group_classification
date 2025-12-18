@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np # xlsxwriter 설치 필요 (다른 환경에서)
 import traceback
 import io
+
+import cost_group_move_v4
 # 로그 함수만
 def log(msg: str):
     with open("special_assign_log.txt", "a", encoding="utf-8") as f:
@@ -879,7 +881,7 @@ with tabs[3]:
         try:
             if all(k in st.session_state for k in ['merged_df', 'selected_algorithm', 'selected_sort_variable_dict', 'selected_discrete_variable', 'sex_classification', 'group_count', 'subject_based_classification', 'absent_student_handling', 'special_student_handling', 'school_based_classification']):
                 from init_group_assign_v2 import tuple_from_df, suitable_bin_value, init_group_assign_v2
-                from cost_group_move_v3 import compute_ideal_discrete_freq, cost_group_move_v3, compute_group_discrete_freq, compute_group_total_cost, compute_group_diff_and_sign, compute_continuous_cost, compute_discrete_cost
+                from cost_group_move_v4 import compute_ideal_discrete_freq, cost_group_move_v4, compute_group_discrete_freq, compute_group_total_cost, compute_group_diff_and_sign, compute_continuous_cost, compute_discrete_cost
                 # 병합된 데이터프레임 불러오기
                 df = st.session_state['merged_df'] # 앞에서 결시생, 동명이인 처리까지 완료된 데이터프레임
                 # 사용자가 성별을 선택한 경우 병합 후에 성별_명렬표로 명시
@@ -960,7 +962,7 @@ with tabs[3]:
                     group_assign_df['초기그룹'] = group_assign
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
-                    group_assign_df = cost_group_move_v3(100, 0.5, 100, 100, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move_v4(100, 0.1, 100, 100, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 반 분류가 완료되었습니다.")
                     #group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False) #! 초기 그룹 배정 저장
@@ -982,8 +984,8 @@ with tabs[3]:
                         # 초기 group_assign과 subject_df 병합
                         subject_df['초기그룹'] = group_assign
                         # cost 함수 기반으로 그룹 배정 최적화
-                        subject_group_assign_df = cost_group_move_v3(100, 0.5, 100, 1, subject_df, selected_discrete_variable, selected_sort_variable_dict)
-                        # 그룹 번호 조정은 cost_group_move_v3 후에 처리
+                        subject_group_assign_df = cost_group_move_v4(100, 0.1, 100, 100, subject_df, selected_discrete_variable, selected_sort_variable_dict)
+                        # 그룹 번호 조정은 cost_group_move_v4 후에 처리
                         subject_group_assign_df['초기그룹'] = subject_group_assign_df['초기그룹'] + start_group_number
                         group_assign_df = pd.concat([group_assign_df, subject_group_assign_df], axis=0)
                         start_group_number = start_group_number + len(np.unique(subject_group_assign_df['초기그룹']))
@@ -1012,8 +1014,8 @@ with tabs[3]:
                             selected_discrete_variable.remove("성별_명렬표")
                         else:
                             pass
-                        gender_group_assign_df = cost_group_move_v3(100, 0.5, 100, 1, gender_df, selected_discrete_variable, selected_sort_variable_dict)
-                        # 그룹 번호 조정은 cost_group_move_v3 후에 처리
+                        gender_group_assign_df = cost_group_move_v4(100, 0.1, 100, 100, gender_df, selected_discrete_variable, selected_sort_variable_dict)
+                        # 그룹 번호 조정은 cost_group_move_v4 후에 처리
                         gender_group_assign_df['초기그룹'] = gender_group_assign_df['초기그룹'] + start_group_number
                         group_assign_df = pd.concat([group_assign_df, gender_group_assign_df], axis=0)
                         start_group_number = start_group_number + len(np.unique(gender_group_assign_df['초기그룹']))
@@ -1042,8 +1044,8 @@ with tabs[3]:
                             selected_discrete_variable.remove("성별_명렬표")
                         else:
                             pass
-                        gender_subject_group_assign_df = cost_group_move_v3(100, 0.5, 100, 1, gender_subject_df, selected_discrete_variable, selected_sort_variable_dict)
-                        # 그룹 번호 조정은 cost_group_move_v3 후에 처리
+                        gender_subject_group_assign_df = cost_group_move_v4(100, 0.1, 100, 100, gender_subject_df, selected_discrete_variable, selected_sort_variable_dict)
+                        # 그룹 번호 조정은 cost_group_move_v4 후에 처리
                         gender_subject_group_assign_df['초기그룹'] = gender_subject_group_assign_df['초기그룹'] + start_group_number
                         group_assign_df = pd.concat([group_assign_df, gender_subject_group_assign_df], axis=0)
                         start_group_number = start_group_number + len(np.unique(gender_subject_group_assign_df['초기그룹']))
@@ -1065,7 +1067,7 @@ with tabs[3]:
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
                     print('초기 배정 병합 후 이산형 변수 열 확인', )
-                    group_assign_df = cost_group_move_v3(100, 0.5, 100, 1, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move_v4(100, 0.1, 100, 100, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 반 분류가 완료되었습니다.")
                     #group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False)
@@ -1086,8 +1088,8 @@ with tabs[3]:
                         # 초기 group_assign과 subject_df 병합
                         subject_df['초기그룹'] = subject_group_assign
                         # cost 함수 기반으로 그룹 배정 최적화
-                        subject_group_assign_df = cost_group_move_v3(100, 0.5, 100, 1, subject_df, selected_discrete_variable, selected_sort_variable_dict)
-                        # 그룹 번호 조정은 cost_group_move_v3 후에 처리
+                        subject_group_assign_df = cost_group_move_v4(100, 0.1, 100, 100, subject_df, selected_discrete_variable, selected_sort_variable_dict)
+                        # 그룹 번호 조정은 cost_group_move_v4 후에 처리
                         subject_group_assign_df['초기그룹'] = subject_group_assign_df['초기그룹'] + start_group_number
                         group_assign_df = pd.concat([group_assign_df, subject_group_assign_df], axis=0)
                         start_group_number = start_group_number + len(np.unique(subject_group_assign_df['초기그룹']))
