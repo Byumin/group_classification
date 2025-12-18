@@ -1412,7 +1412,7 @@ def cost_group_move_v3(max_iter, tolerance, w_discrete, w_continuous, init_group
                 print(group_sizes)
                 group_mean_size = group_sizes.mean()
                 # 이상적인 평균치 산출
-                pop_mean = init_grouped_df[selected_sort_variable].mean()
+                pop_mean = float(init_grouped_df[selected_sort_variable].mean())
                 # 그룹별 총 불균형도 계산 <- 여기에 연속형뿐만 아니라 그룹 n크기도 반영해야됨.
                 group_abs_mean_cost = {}
                 groups = init_grouped_df['초기그룹'].unique()
