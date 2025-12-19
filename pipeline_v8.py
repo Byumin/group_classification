@@ -1700,17 +1700,32 @@ with tabs[4]:
                 summary_special = final_group_assign_df.groupby('초기그룹')[existing_cols].sum().reset_index()
                 summary_special.to_excel('디버깅_관계재배정후_특이분류학생_summary.xlsx', index=False)
 
-                balanced_df = cost_group_swap_special_v2(
-                    50, 100, 1, 
-                    final_group_assign_df,
-                    existing_cols,
-                    relationship_dict,
-                    selected_discrete_variable,
-                    selected_sort_variable_dict)
+                final_results = []
+                if groupby_cols:
+                    for group_keys, sub_df in final_group_assign_df.groupby(groupby_cols):
+                        print(f"\n===== Group {group_keys} 특이분류 재배정 시작 =====")
 
-                balanced_df.to_excel('디버깅_특이분류학생_이동후.xlsx', index=False)
+                        swapped_sub_df = cost_group_swap_special_v2(
+                            50, 100, 1,
+                            sub_df,
+                            existing_cols,
+                            relationship_dict,
+                            selected_discrete_variable,
+                            selected_sort_variable_dict)
+                        final_results.append(swapped_sub_df)
+                    final_group_assign_df = pd.concat(final_results, ignore_index=True)
+                else:
+                    final_group_assign_df = cost_group_swap_special_v2(
+                        50, 100, 1, 
+                        final_group_assign_df,
+                        existing_cols,
+                        relationship_dict,
+                        selected_discrete_variable,
+                        selected_sort_variable_dict)
 
-                summary = balanced_df.groupby('초기그룹')[existing_cols].sum().reset_index()
+                final_group_assign_df.to_excel('디버깅_특이분류학생_이동후.xlsx', index=False)
+
+                summary = final_group_assign_df.groupby('초기그룹')[existing_cols].sum().reset_index()
                 summary.to_excel('디버깅_특이분류학생_이동후_summary.xlsx', index=False)
 
                 # 관계 설정이 걸린 학생들 결과 확인
