@@ -1093,7 +1093,7 @@ with tabs[3]:
                         start_group_number = start_group_number + len(np.unique(subject_group_assign_df['초기그룹']))
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 반 분류가 완료되었습니다.")
-                    #group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False)
+                    # group_assign_df.to_excel('group_assign_df_초기반배정후_관계배정전.xlsx', index=False)
                 else:
                     st.error("반 분류에 필요한 설정이 올바르게 되어있는지 확인해주세요.")
             else:
@@ -1455,7 +1455,7 @@ with tabs[3]:
             freq_df = (group_assign_df.groupby(groupby_cols)[existing_cols].sum().astype(int))
             st.markdown("##### 반 별 배정된 특이분류학생(특수학생, 전출예정, 운동부, 결시생 등) 현황")
             st.dataframe(freq_df.reset_index().assign(초기그룹=lambda x: x['초기그룹'] + 1), use_container_width=True, hide_index=True)
-            # group_assign_df.to_excel('group_assign_df_초기반분류완료.xlsx', index=False) #! 초기 반 분류 완료 저장
+            group_assign_df.to_excel('group_assign_df_초기반분류완료.xlsx', index=False) #! 초기 반 분류 완료 저장
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -1528,6 +1528,7 @@ with tabs[4]:
         st.markdown("#### 저장된 관계 요약 및 관리")
         if st.session_state['relationship_dict']:
             rel_df = pd.DataFrame.from_dict(st.session_state['relationship_dict'], orient='index').fillna(0)
+            rel_df.to_excel('저장된 관계 요약 및 관리.xlsx', index=False)
             st.dataframe(rel_df, use_container_width=True)
 
             col1, col2 = st.columns([1, 1])
@@ -1576,8 +1577,8 @@ with tabs[4]:
                 st.info("동명이인 관계가 다른반으로 추가되었습니다.")
 
                 # 관계(relationship_dict) 텍스트 저장
-                # with open('relationship_dict.txt', 'w', encoding='utf-8') as f:
-                #     f.write(str(st.session_state['relationship_dict']))
+                with open('relationship_dict.txt', 'w', encoding='utf-8') as f:
+                    f.write(str(st.session_state['relationship_dict']))
                 # 그룹 재배정 로직 실행
                 selected_discrete_variable = st.session_state.get('selected_discrete_variable', [])
                 selected_discrete_variable = ['성별_명렬표' if var == '성별' else var for var in selected_discrete_variable]
@@ -1613,8 +1614,13 @@ with tabs[4]:
 
                 if groupby_cols:
                     grouped_dfs = dict(tuple(group_assign_df.groupby(groupby_cols)))
-
-                    for group_key, sub_df in grouped_dfs.items():
+                    # grouped_dfs : 아래와 같은 형태
+                    # {
+                    # 1반: sub_df_1,
+                    # 2반: sub_df_2,
+                    # 3반: sub_df_3
+                    # }
+                    for group_key, sub_df in grouped_dfs.items(): # sub_df 는 한 반의 학생들만 담긴 df
                         st.write(f"🔁 관계 기반 재배정 중... 반 단위: {group_key}, 학생 수: {len(sub_df)}")
 
                         # 관계딕셔너리 중 현재 그룹에 속한 학생만 필터링
@@ -1624,6 +1630,13 @@ with tabs[4]:
                             for a, rels in relationship_dict.items()
                             if a in valid_students
                         }
+                        # 관계딕셔너리를 반 단위로 필터링한 것
+                        # 같은 반 학생의 관계만 남고, 다른 반 학생 관계는 전부 제거됨
+                        # import pprint
+                        # with open("sub_rel_dict.txt", "w", encoding="utf-8") as f:
+                        #     pprint.pprint(sub_rel_dict, stream=f)
+
+
 
                         if not sub_rel_dict:
                             st.info(f"{group_key}: 관계 정보 없음, 기존 반 유지")
@@ -1659,17 +1672,18 @@ with tabs[4]:
                 else:
                     # 전체 단위로 관계 재배정
                     st.write("🔁 전체 단위로 관계 기반 재배정 중...")
+                    
                     groups = find_relation_groups_minimal(
                         relationship_dict,
                         max_iter=10,
                         target_n_groups=group_assign_df['초기그룹'].nunique(),
                         verbose=True
                     )
-                    # with open("relation_groups.txt", "w", encoding="utf-8") as f:
-                    #     for g in groups:
-                    #         f.write(str(g) + "\n")
-                    #     f.write(f"타깃 그룹 수: {group_assign_df['초기그룹'].nunique()}\n")
-                    #     f.write(f"관계 딕셔너리: {relationship_dict}\n")
+                    with open("relation_groups.txt", "w", encoding="utf-8") as f:
+                        for g in groups:
+                            f.write(str(g) + "\n")
+                        f.write(f"타깃 그룹 수: {group_assign_df['초기그룹'].nunique()}\n")
+                        f.write(f"관계 딕셔너리: {relationship_dict}\n")
                     relationship_group_dict, relationship_group_df_dict = relation_groups_to_dict(groups, group_assign_df)
                     remaining_df, best_assignment, best_total_cost = assign_relation_groups_optimal(
                         group_assign_df, relationship_group_dict, relationship_group_df_dict, selected_discrete_variable
@@ -1686,8 +1700,54 @@ with tabs[4]:
                 # 결과 병합 및 저장
                 final_group_assign_df = pd.concat(final_results, ignore_index=True)
                 st.session_state['final_group_assign_df'] = final_group_assign_df
-                # final_group_assign_df.to_excel('final_group_assign_df.xlsx', index=False)
+                final_group_assign_df.to_excel('final_group_assign_df_관계재배정이후.xlsx', index=False)
                 st.success("🎉 관계 기반 반 재배정이 완료되었습니다.")
+
+                ########################################################
+                ########################################################
+                # summary = final_group_assign_df.groupby('초기그룹')[existing_cols].sum().reset_index()
+                # summary.to_excel('디버깅_관계재배정후_반별_특이분류학생.xlsx', index=False)
+
+                # # 기대값 대비 편차가 1명을 초과할 때
+                # uneven_groups = {}
+                # for col in existing_cols:
+                #     expected = summary[col].sum() / summary['초기그룹'].nunique()
+                #     deviation_abs = (summary[col] - expected).abs() # 각 그룹별 편차 계산
+                #     col_name = f'불균등_{col}'
+                #     summary[col_name] = deviation_abs > 1 # 1명 초과
+                #     uneven_groups[col] = summary.loc[summary[col_name], '초기그룹'].tolist()
+                # summary.drop(columns=[c for c in summary.columns if c.startswith('불균등_') and summary[c].sum() == 0], inplace=True)
+                # summary.to_excel('디버깅_관계재배정후_반별 불균등 출력.xlsx', index=False)
+
+                from cost_group_move_v2 import *
+                # from cost_group_move_v2 import cost_group_move_v2, balance_special_students_v2
+
+                # special_cols = ['특수학생', '결시생', '운동부', '전출예정']
+                special_cols = ['운동부', '전출예정', '결시생', '특수학생']
+
+                existing_cols = [col for col in special_cols if col in final_group_assign_df.columns]
+                
+                summary_special = final_group_assign_df.groupby('초기그룹')[existing_cols].sum().reset_index()
+                summary_special.to_excel('디버깅_관계재배정후_특이분류학생_summary.xlsx', index=False)
+
+                balanced_df = cost_group_swap_special_v2(
+                    50, 100, 1, 
+                    final_group_assign_df,
+                    existing_cols,
+                    relationship_dict,
+                    selected_discrete_variable,
+                    selected_sort_variable_dict)
+
+                balanced_df.to_excel('디버깅_특이분류학생_이동후.xlsx', index=False)
+
+                summary = balanced_df.groupby('초기그룹')[existing_cols].sum().reset_index()
+                summary.to_excel('디버깅_특이분류학생_이동후_summary.xlsx', index=False)
+
+
+                ########################################################
+                ########################################################
+
+                
                 # 관계 설정이 걸린 학생들 결과 확인
                 st.subheader("관계 설정이 적용된 학생들 결과 확인")
                 relationship_dict = st.session_state['relationship_dict']
@@ -1710,7 +1770,7 @@ with tabs[4]:
                         for b, v in rels.items():
                             relation_summary.append({"학생A": a, "학생B": b, "관계": "같은 반" if v==1 else "다른 반"})
                     relation_summary_df = pd.DataFrame(relation_summary)
-                    #relation_summary_df.to_excel('relation_summary_df.xlsx', index=False)
+                    # relation_summary_df.to_excel('relation_summary_df.xlsx', index=False)
                     # relation_summary_df과 related_df의 그룹 배정 결과만 병합
                     relation_summary_df['학생A_그룹'] = relation_summary_df['학생A'].map(final_group_assign_df.set_index('merge_key')['초기그룹'])
                     relation_summary_df['학생B_그룹'] = relation_summary_df['학생B'].map(final_group_assign_df.set_index('merge_key')['초기그룹'])
