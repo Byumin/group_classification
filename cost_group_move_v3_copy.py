@@ -1391,12 +1391,17 @@ def cost_group_move_v3(max_iter, tolerance, w_discrete, w_continuous, init_group
         # -------------------------------------------------
         if not selected_discrete_variable :
             print("이산형 변수가 선택되지 않아 이산형 비용 함수 계산을 건너뜁니다.")
+            # 이산형 변수 대신 그룹 크기를 가지고 비용 행렬 계산을 해야함
+            # init_grouped_df에 이산형 변수를 대신할 수 있는 '그룹크기' 변수를 추가
+            init_grouped_df['그룹크기'] = 1 # 각 학생마다 1로 설정
+            selected_discrete_variable = ['그룹크기'] # 그룹 크기 변수를 이산형 변수로 설정
             selected_sort_variable = list(selected_sort_variable_dict.keys()) # selected_sort_variable_dict : 딕셔너리 형태로 입력됨 (오른쪽으로 갈수록 우선순위 높음)
             print(f"선택된 연속형 변수: {selected_sort_variable}")
-            ideal_freq = init_grouped_df.groupby('초기그룹').size().mean() # 이상적인 그룹 크기
-            print(f"이상적인 그룹 크기: {ideal_freq}")
-            
-            # 이전 총 비용 계산, 연속형 변수와 그룹 크기만 반영
+            ideal_freq = compute_ideal_discrete_freq(init_grouped_df, selected_discrete_variable)
+            print("이상적인 이산형 변수 빈도수:")
+            print(ideal_freq)
+
+            # 이전 총 비용 계산, 연속형, 이산형 모두 반영
             prev_group_mean = init_grouped_df.groupby('초기그룹')[selected_sort_variable].mean()
             print("이전 그룹별 연속형 변수 평균:")
             print(prev_group_mean)
@@ -1405,32 +1410,34 @@ def cost_group_move_v3(max_iter, tolerance, w_discrete, w_continuous, init_group
             diff_df = (prev_group_mean - prev_pop_mean).abs()
             prev_diff_cost = diff_df.mean().mean() # 그룹 별 평균과 전체 평균의 차이의 절대값 합 -> 값이 클수록 불균형
             print(f"이전 연속형 불균형도: {prev_diff_cost}")
-            group_freq = init_grouped_df.groupby('초기그룹').size().to_dict()  # 각 그룹별 실제 그룹 크기
-            print("이전 그룹별 실제 크기:")
+            group_freq = compute_group_discrete_freq(init_grouped_df, selected_discrete_variable) # 각 그룹별 이산형 실제 빈도
+            print("이전 그룹별 이산형 변수 빈도수:")
             print(group_freq)
-            group_size_cost = {k: abs(v - ideal_freq) for k, v in group_freq.items()} # 각 그룹별 크기 불균형도
-            print("이전 그룹별 크기 불균형도:")
-            print(group_size_cost)
-            prev_size_total_cost = sum(group_size_cost.values())
-            print(f"이전 그룹 크기 총 불균형도: {prev_size_total_cost}")
-            print(f"이전 연속형 비용: {prev_diff_cost}, 이전 그룹 크기 비용: {prev_size_total_cost}")
-            prev_total_cost = 10 * prev_diff_cost + 10 * prev_size_total_cost
+            _, group_total_cost_square = compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable) # 각 그룹별 이산형 총 불균형도
+            #prev_disc_cost = {k: abs(v) for k, v in prev_disc_cost.items()} # 절대값 변환
+            print("이전 그룹별 이산형 불균형도:")
+            print(group_total_cost_square)
+            prev_disc_total_cost = sum(group_total_cost_square.values())
+            print(f"이전 이산형 총 불균형도: {prev_disc_total_cost}")
+            print(f"이전 연속형 비용: {prev_diff_cost}, 이전 이산형 비용: {prev_disc_total_cost}")
+            prev_total_cost = 10 * prev_diff_cost + 10 * prev_disc_total_cost
+            # prev_total_cost = 10 * prev_disc_total_cost 
             print(f"이전 총 비용: {prev_total_cost}")
 
             for iter_num in range(max_iter):
                 print(f"\n======= Iteration {iter_num+1} =======")
                 # 1) 현재 그룹 diff 계산
-                print("이상적인 그룹 크기:")
+                print("이상적인 그룹 이산형 빈도수:")
                 print(dict(sorted(ideal_freq.items())))
-                group_freq = init_grouped_df.groupby('초기그룹').size().to_dict()  # 각 그룹별 실제 그룹 크기
-                print("이동 전 그룹 실제 크기:")
+                group_freq = compute_group_discrete_freq(init_grouped_df, selected_discrete_variable)
+                print("이동 전 그룹 이산형 빈도수:")
                 print(dict(sorted(group_freq.items())))
-                group_size_cost = {k: abs(v - ideal_freq) for k, v in group_freq.items()} # 각 그룹별 크기 불균형도
-                print("그룹별 크기 불균형도:")
-                print(dict(sorted(group_size_cost.items())))
+                group_total_cost, _ = compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable)
+                print("그룹별 총 불균형도:")
+                print(dict(sorted(group_total_cost.items())))
 
                 # 2) 이동 우선 그룹 선택
-                source_group_idx = min(group_size_cost, key=group_size_cost.get) # 정확하게 그룹 번호를 넘겨줌
+                source_group_idx = min(group_total_cost, key=group_total_cost.get) # 정확하게 그룹 번호를 넘겨줌
                 #! 봤을때 최소 그룹 하나만 나와서 비용계산을 하기 때문에 개선이 잘 안되는 문제 있음
 
                 # 3) 출발 학생 목록 가져오기
@@ -1443,22 +1450,49 @@ def cost_group_move_v3(max_iter, tolerance, w_discrete, w_continuous, init_group
                 groups = init_grouped_df['초기그룹'].unique()
                 target_group_list = [g for g in groups if g != source_group_idx]
 
-                # 5) 연속형 비용 행렬 계산
+                # 5) diff 행렬화
+                diff_matrix, sign_matrix, var_to_idx, cat_to_idx, diffmatrixidx_to_groupno = array_diff_and_sign(
+                    ideal_freq, group_freq, selected_discrete_variable
+                )
+
+                # 6) 이산형 비용 행렬 계산
+                disc_matrix, arrayidx_to_studentidx, arrayidx_to_targetgroupno = array_discrete_cost_v5(
+                    selected_discrete_variable,
+                    source_group_df,
+                    group_total_cost,
+                    target_group_list,
+                    diff_matrix,
+                    var_to_idx,
+                    cat_to_idx,
+                    diffmatrixidx_to_groupno
+                )
+
+                # 7) 연속형 비용 행렬 계산
                 cont_matrix = array_multi_continuous_cost(
                     init_grouped_df, # 모집단 평균을 함수 내부에서 계산해서 필요함
                     source_group_df,
                     target_group_list,
                     selected_sort_variable
                 )
-                # 6) 총 비용 행렬
-                total_matrix = w_continuous * cont_matrix
+
+                # 8) 총 비용 행렬
+                total_matrix = w_discrete * disc_matrix + w_continuous * cont_matrix
+                # # 8) 총 비용 행렬
+                # total_matrix = w_discrete * disc_matrix
+
                 # 이동 불가 조합 배제
                 valid_mask = np.isfinite(total_matrix)
                 if not valid_mask.any():
-                    print("이동 가능한 조합이 없어 중단합니다.")
+                    print("유효한 이동 가능 조합 없음. 종료.")
                     break
 
-                # 7) 최적 이동 조합 찾기
+                # 디버깅
+                print("=== 배열에서 타깃그룹번호 매핑 자료 ===")
+                print(arrayidx_to_targetgroupno)
+                print("=== 배열에서 학생번호 매핑 자료 ===")
+                print(arrayidx_to_studentidx)
+
+                # 9) 최적 이동 조합 찾기
                 max_cost_change_targetgroup_indices = np.argmax(total_matrix, axis=1) # 각 학생별로 가장 큰 비용 변화의 타깃 그룹 인덱스(배열)
                 print("=== 각 학생별 최적 타깃 그룹 인덱스(배열) ===")
                 print(max_cost_change_targetgroup_indices)
@@ -1472,18 +1506,17 @@ def cost_group_move_v3(max_iter, tolerance, w_discrete, w_continuous, init_group
                 print("=== 최적 이동 학생 비용 변화 값 ===")
                 print(max_cost_change_overall_value)
                 # 최적 이동 조합 출력하기 위해 배열 인덱스를 실제 학생/그룹 id로 변환
-                #max_cost_change_targetgroup_no = arrayidx_to_targetgroupno[max_cost_change_targetgroup_indices[max_cost_change_student_index]]
+                max_cost_change_targetgroup_no = arrayidx_to_targetgroupno[max_cost_change_targetgroup_indices[max_cost_change_student_index]]
                 print("=== 최적 이동 타깃 그룹 번호(df) ===")
-                print(max_cost_change_targetgroup_indices)
-                #max_cost_change_student_no = arrayidx_to_studentidx[max_cost_change_student_index]
+                print(max_cost_change_targetgroup_no)
+                max_cost_change_student_no = arrayidx_to_studentidx[max_cost_change_student_index]
                 print("=== 최적 이동 학생 번호(df) ===")
-                print(max_cost_change_student_index)
-                
-                # 실제 학생/그룹 id로 변환
-                idx_s = max_cost_change_student_index
-                idx_t = 
+                print(max_cost_change_student_no)
 
-                # 8) 실제 그룹 이동
+                # 실제 학생/그룹 id로 변환
+                idx_s = max_cost_change_student_no
+                idx_t = max_cost_change_targetgroup_no
+
                 print("\n=== 선택된 최적 이동 ===")
                 print("존재하는 모든 그룹 번호")
                 print(init_grouped_df['초기그룹'].unique())
@@ -1491,6 +1524,41 @@ def cost_group_move_v3(max_iter, tolerance, w_discrete, w_continuous, init_group
                 print(student_df.loc[idx_s, selected_discrete_variable])
                 print(f"출발 → 도착: {init_grouped_df.at[idx_s,'초기그룹']} → {idx_t}")
 
+                # 10) 실제 이동 적용
+                init_grouped_df.at[idx_s, '초기그룹'] = idx_t
+                # 이동 기록 업데이트
+                # move_history.append(move_key)
+                # 이동 후 비용 계산
+                new_group_mean = init_grouped_df.groupby('초기그룹')[selected_sort_variable].mean()
+                print("askjdhjkxakhjlchjklvaskhjlvakjlhsvadjklvadkjlasjklv")
+                print(new_group_mean)
+                print(new_group_mean.dtypes)
+                new_pop_mean = init_grouped_df[selected_sort_variable].mean()
+                print(new_pop_mean)
+                print(new_pop_mean.dtypes)
+                diff_df = (new_group_mean - new_pop_mean).abs()
+                new_diff_cost = diff_df.mean().mean() # 그룹 별 평균과 전체 평균의 차이의 절대값 합
+                print(f'{new_diff_cost} is new diff cost')
+                group_freq = compute_group_discrete_freq(init_grouped_df, selected_discrete_variable)
+                _, new_disc_cost_square = compute_group_total_cost(ideal_freq, group_freq, selected_discrete_variable) # 각 그룹별 이산형 총 불균형도
+                #new_disc_cost = {k: abs(v) for k, v in new_disc_cost.items()} # 절대값 변환
+                new_disc_total_cost = sum(new_disc_cost_square.values())
+                new_total_cost = 10 * new_diff_cost + 10 * new_disc_total_cost
+                # new_total_cost = 10 * new_disc_total_cost
+                print(f"이전 총 비용: {prev_total_cost}, 새로운 총 비용: {new_total_cost}")
+                # 비용 개선폭 계산
+                improvement = abs(prev_total_cost - new_total_cost)
+                #print(f"비용 개선폭: {improvement:.6f}")
+                # 이동 후 그룹별 평균과 분포 출력
+                group_freq = compute_group_discrete_freq(init_grouped_df, selected_discrete_variable)
+                print("이동후 그룹별 이산형 빈도수:")
+                print(dict(sorted(group_freq.items())))
+                if improvement < tolerance:
+                    print("개선 폭이 작아 중단합니다.")
+                    break
+                prev_total_cost = new_total_cost
+            # 그룹크기를 이산형 변수로 사용했기 때문에 해당 변수 삭제
+            init_grouped_df = init_grouped_df.drop(columns=['그룹크기'])
 
         # -------------------------------------------------
         # 이산형, 연속형 변수를 모두 선택한 경우
