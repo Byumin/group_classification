@@ -1058,8 +1058,6 @@ def cost_group_move_v2(max_iter, tolerance, w_discrete, w_continuous, init_group
     return init_grouped_df
 
 
-###########################################################
-###########################################################
 import numpy as np
 def discrete_filter(s_row, t_row, discrete_vars):
     """ 모든 이산형 변수가 동일한 경우만 True """
@@ -1070,13 +1068,11 @@ def discrete_filter(s_row, t_row, discrete_vars):
         # 결측은 불일치로 간주
         if pd.isna(s_val) or pd.isna(t_val):
             return False
-
         if s_val != t_val:
             return False
-
     return True
 
-def compute_discrete_cost_v1(s_row, t_row, selected_discrete_variable):
+def compute_discrete_cost_v2(s_row, t_row, selected_discrete_variable):
     """
     이산형 변수 비용 계산
     - 서로 다르면 1
@@ -1088,7 +1084,7 @@ def compute_discrete_cost_v1(s_row, t_row, selected_discrete_variable):
             cost += 1
     return cost
 
-def compute_continuous_cost_v1(s_row, t_row, cont_vars):
+def compute_continuous_cost_v2(s_row, t_row, cont_vars):
     """ 연속형 변수 기반 유클리드 거리 계산 """
     diffs = []
     for col in cont_vars:
@@ -1120,7 +1116,7 @@ def compute_group_cost_after_swap(counts, expected, source_group, target_group):
 
 
 # 중간에 최적의 도착그룹 찾는 단계 추가
-def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_grouped_df, special_cols, relationship_dict, selected_discrete_variable, selected_sort_variable_dict): #, sex_cls, subject_cls):
+def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_grouped_df, special_cols, relationship_dict, selected_discrete_variable, selected_sort_variable_dict):
     """
     특이분류학생 균등 배치:
     - 출발/도착 그룹은 col 기준 편차로 결정
@@ -1173,11 +1169,9 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                 for s_idx, s_row in source_students.iterrows():
                     s_name = s_row['merge_key']
                     neg_targets = {t for t, v in relationship_dict.get(s_name, {}).items() if v == -1}
-                    # best_target_group = None
-                    # best_group_cost = float("inf")
 
                     for t_group in target_groups:
-                        # t_group으로 갔을 때 그룹균형 비용
+                        # t_group으로 갔을 때 그룹균형 비용계산
                         group_cost = compute_group_cost_after_swap(counts, expected, source_group, t_group)
 
                         target_students = df[
@@ -1193,8 +1187,8 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                         best_sim = float("inf")
 
                         for t_idx, t_row in target_students.iterrows():
-                            disc_cost = compute_discrete_cost_v1(s_row, t_row, selected_discrete_variable)
-                            cont_cost = compute_continuous_cost_v1(s_row, t_row, cont_vars)
+                            disc_cost = compute_discrete_cost_v2(s_row, t_row, selected_discrete_variable)
+                            cont_cost = compute_continuous_cost_v2(s_row, t_row, cont_vars)
                             sim_cost = w_discrete * disc_cost + w_continuous * cont_cost
 
                             if sim_cost < best_sim:
@@ -1296,8 +1290,8 @@ def cost_group_swap_special_v1(max_iter_per_col, w_discrete, w_continuous, init_
                             if t_name in neg_targets:
                                 continue
 
-                            disc_cost = compute_discrete_cost_v1(s_row, t_row, selected_discrete_variable)
-                            cont_cost = compute_continuous_cost_v1(s_row, t_row, cont_vars)
+                            disc_cost = compute_discrete_cost_v2(s_row, t_row, selected_discrete_variable)
+                            cont_cost = compute_continuous_cost_v2(s_row, t_row, cont_vars)
                             total_cost = w_discrete * disc_cost + w_continuous * cont_cost # 특이분류 불균형 비용 추가
                             if total_cost < best_cost:
                                 best_cost = total_cost
@@ -1324,7 +1318,7 @@ def cost_group_swap_special_v1(max_iter_per_col, w_discrete, w_continuous, init_
 
 
 ###########################################################
-# 케이스별 groupby 적용 했을때 코드 copy
+# v1 + 케이스별 groupby 적용 했을때 코드 copy
 ###########################################################
 
 # def get_groupby_cols(sex_cls, subject_cls):

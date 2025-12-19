@@ -1705,28 +1705,10 @@ with tabs[4]:
                 final_group_assign_df.to_excel('final_group_assign_df_관계재배정이후.xlsx', index=False)
                 st.success("🎉 관계 기반 반 재배정이 완료되었습니다.")
 
-                ########################################################
-                ########################################################
-                # summary = final_group_assign_df.groupby('초기그룹')[existing_cols].sum().reset_index()
-                # summary.to_excel('디버깅_관계재배정후_반별_특이분류학생.xlsx', index=False)
-
-                # # 기대값 대비 편차가 1명을 초과할 때
-                # uneven_groups = {}
-                # for col in existing_cols:
-                #     expected = summary[col].sum() / summary['초기그룹'].nunique()
-                #     deviation_abs = (summary[col] - expected).abs() # 각 그룹별 편차 계산
-                #     col_name = f'불균등_{col}'
-                #     summary[col_name] = deviation_abs > 1 # 1명 초과
-                #     uneven_groups[col] = summary.loc[summary[col_name], '초기그룹'].tolist()
-                # summary.drop(columns=[c for c in summary.columns if c.startswith('불균등_') and summary[c].sum() == 0], inplace=True)
-                # summary.to_excel('디버깅_관계재배정후_반별 불균등 출력.xlsx', index=False)
-
+                # 특이분류학생 교환
                 from cost_group_move_v2 import *
-                # from cost_group_move_v2 import cost_group_move_v2, balance_special_students_v2
-
                 # special_cols = ['특수학생', '결시생', '운동부', '전출예정']
                 special_cols = ['운동부', '전출예정', '결시생', '특수학생']
-
                 existing_cols = [col for col in special_cols if col in final_group_assign_df.columns]
                 
                 summary_special = final_group_assign_df.groupby('초기그룹')[existing_cols].sum().reset_index()
@@ -1746,10 +1728,6 @@ with tabs[4]:
                 summary.to_excel('디버깅_특이분류학생_이동후_summary.xlsx', index=False)
 
 
-                ########################################################
-                ########################################################
-
-                
                 # 관계 설정이 걸린 학생들 결과 확인
                 st.subheader("관계 설정이 적용된 학생들 결과 확인")
                 relationship_dict = st.session_state['relationship_dict']
