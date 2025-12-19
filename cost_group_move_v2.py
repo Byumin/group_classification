@@ -1136,9 +1136,11 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
             expected = summary[col].sum() / summary['초기그룹'].nunique()
             summary['편차'] = summary[col] - expected
 
-            source_groups = summary.loc[summary['편차'] >= 1, '초기그룹'].tolist()
-            target_groups = summary.loc[summary['편차'] <= -1, '초기그룹'].tolist()
-
+            # 출발그룹 선정
+            source_groups = summary.loc[summary['편차'] >= 1, '초기그룹'].tolist() # 여러개 나올 수 있음
+            # 도착그룹 선정
+            target_groups = summary.loc[summary['편차'] <= -1, '초기그룹'].tolist() # 여러개 나올 수 있음
+            # 출발, 도착그룹 특이 조건 처리
             if not source_groups and not target_groups:
                 print(f"[{col}] 모든 반이 기대값 ±1 이내 → 종료")
                 break
@@ -1148,20 +1150,22 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
             elif target_groups and not source_groups:
                 max_val = summary['편차'].max()
                 source_groups = summary.loc[summary['편차'] == max_val, '초기그룹'].tolist()
+            #### 출발, 도착그룹이 정해지면
 
             counts = dict(zip(summary['초기그룹'], summary[col]))
             # print("counts >>> ", counts)
-            # 그룹 간 비용 계산
-            group_costs = {}
+
+            # 그룹 간 교환했을때 그룹 대상인 비용 계산
+            group_costs = {} # (출발그룹, 도착그룹) : 비용 (이상치와 비교해서 얼마나 개선되는지, 작을수록 좋음)
             for sg in source_groups:
                 for tg in target_groups:
                     group_costs[(sg, tg)] = compute_group_cost_after_swap(counts, expected, sg, tg)
             
-            # 각 출발그룹마다 최적의 교환
+            # 각 출발그룹마다 각 도착그룹의 학생
             for source_group in source_groups:
-                source_students = df[
+                source_students = df[ # 출발그룹의 True 학생들 중에서 관계그룹 0,-1 인 학생들 제외
                     (df['초기그룹'] == source_group) &
-                    (df[col] == True) &
+                    (df[col] == True) & # 문자, 숫자형 모두 대응되는지 확인 필요
                     (~df['merge_key'].isin(same_class_students)) # 관계그룹 0,-1 인 학생들
                 ]
 
@@ -1181,10 +1185,10 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                         # t_group 안에서 모든 학생과의 유사도 계산
                         sim_costs = []
                         for t_idx, t_row in target_students.iterrows():
-                            disc_cost = compute_discrete_cost_v2(s_row, t_row, selected_discrete_variable)
-                            cont_cost = compute_continuous_cost_v2(s_row, t_row, cont_vars)
-                            sim_costs.append(w_discrete * disc_cost + w_continuous * cont_cost)
-                        avg_sim_cost = sum(sim_costs) / len(sim_costs)
+                            disc_cost = compute_discrete_cost_v2(s_row, t_row, selected_discrete_variable) # 학생 교환 시 이산형 상태 유사도 비용
+                            cont_cost = compute_continuous_cost_v2(s_row, t_row, cont_vars) # 학생 교환 시 연속형 상태 유사도 비용
+                            sim_costs.append(w_discrete * disc_cost + w_continuous * cont_cost) # 학생 교환 시 유사도 비용
+                        avg_sim_cost = sum(sim_costs) / len(sim_costs) # 그룹 대상 유사도 비용 평균
                         total_group_cost = group_costs[(sg, tg)] + avg_sim_cost
                         group_candidates.append((total_group_cost, tg))
 
