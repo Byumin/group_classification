@@ -1135,23 +1135,29 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
             expected = summary[col].sum() / summary['초기그룹'].nunique()
             summary['편차'] = summary[col] - expected
 
-            source_groups = summary.loc[summary['편차'] > 1, '초기그룹'].tolist()
-            target_groups = summary.loc[summary['편차'] < -1, '초기그룹'].tolist()
+            source_groups = summary.loc[summary['편차'] >= 1, '초기그룹'].tolist()
+            target_groups = summary.loc[summary['편차'] <= -1, '초기그룹'].tolist()
 
-            if not source_groups:
+            if not source_groups and not target_groups:
                 print(f"[{col}] 모든 반이 기대값 ±1 이내 → 종료")
                 break
             if source_groups and not target_groups:
                 min_val = summary['편차'].min()
                 target_groups = summary.loc[summary['편차'] == min_val, '초기그룹'].tolist()
-
-            # 유사도 기반 학생 쌍 탐색
-            best_cost = float("inf")
-            best_pair = None
-            # best_groups = None
+            elif target_groups and not source_groups:
+                max_val = summary['편차'].max()
+                source_groups = summary.loc[summary['편차'] == max_val, '초기그룹'].tolist()
 
             counts = dict(zip(summary['초기그룹'], summary[col]))
             # print("counts >>> ", counts)
+            # 그룹 간 비용 계산
+            group_costs = {}
+            for sg in source_groups:
+                for tg in target_groups:
+                    group_costs[(sg, tg)] = compute_group_cost_after_swap(counts, expected, sg, tg)
+            
+            # 각 출발그룹마다 최적의 교환
+            swap_count = 0
             for source_group in source_groups:
                 source_students = df[
                     (df['초기그룹'] == source_group) &
@@ -1159,21 +1165,11 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                     (~df['merge_key'].isin(same_class_students)) # 관계그룹 0,-1 인 학생들
                 ]
 
-                if source_students.empty:
-                    continue
-            
-                # best_cost = float("inf")
-                # best_pair = None
-                # best_groups = None
-                
                 for s_idx, s_row in source_students.iterrows():
                     s_name = s_row['merge_key']
                     neg_targets = {t for t, v in relationship_dict.get(s_name, {}).items() if v == -1}
-
+                    group_candidates = []
                     for t_group in target_groups:
-                        # t_group으로 갔을 때 그룹균형 비용계산
-                        group_cost = compute_group_cost_after_swap(counts, expected, source_group, t_group)
-
                         target_students = df[
                             (df['초기그룹'] == t_group) &
                             (df[col] == False) &
@@ -1181,44 +1177,68 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                         ]
                         if target_students.empty:
                             continue
-
-                        # t_group 안에서 유사도 최소인 t_idx 선택
-                        best_t_idx = None
-                        best_sim = float("inf")
-
+                        
+                        # t_group 안에서 모든 학생과의 유사도 계산
+                        sim_costs = []
                         for t_idx, t_row in target_students.iterrows():
                             disc_cost = compute_discrete_cost_v2(s_row, t_row, selected_discrete_variable)
                             cont_cost = compute_continuous_cost_v2(s_row, t_row, cont_vars)
-                            sim_cost = w_discrete * disc_cost + w_continuous * cont_cost
+                            sim_costs.append(w_discrete * disc_cost + w_continuous * cont_cost)
+                        avg_sim_cost = sum(sim_costs) / len(sim_costs)
+                        total_group_cost = group_costs[(sg, tg)] + avg_sim_cost
+                        group_candidates.append((total_group_cost, tg))
 
-                            if sim_cost < best_sim:
-                                best_sim = sim_cost
-                                best_t_idx = t_idx
+                    if not group_candidates:
+                        continue
+                    # 최적의 도착그룹 선택
+                    _, best_tg = min(group_candidates, key=lambda x: x[0])
 
-                        if best_t_idx is None:
-                            continue
+                # 해당 그룹 안에서 최적의 학생 선택
+                best_pair = None
+                best_cost = float('inf')
 
-                        # 최종 비용 = (그룹 균형 비용) + (학생 유사도 비용)
-                        total_cost = group_cost + best_sim
+                target_students = df[
+                    (df['초기그룹'] == best_tg) &
+                    (df[col] == False) &
+                    (~df['merge_key'].isin(neg_targets))
+                ]
 
-                        if total_cost < best_cost:
-                            best_cost = total_cost
-                            best_pair = (s_idx, best_t_idx)
+                for t_idx, t_row in target_students.iterrows():
+                    disc = compute_discrete_cost_v2(
+                        s_row, t_row, selected_discrete_variable
+                    )
+                    cont = compute_continuous_cost_v2(
+                        s_row, t_row, cont_vars
+                    )
+                    sim_cost = w_discrete * disc + w_continuous * cont
+                    total_cost = group_costs[(sg, best_tg)] + sim_cost
 
-            # swap 실행
-            if best_pair is None:
-                print(f"[{col}] 더 이상 swap 후보 없음 → 종료")
-                break
+                    if total_cost < best_cost:
+                        best_cost = total_cost
+                        best_pair = (s_idx, t_idx)
 
-            s_idx, t_idx = best_pair
-            g_s = df.loc[s_idx, '초기그룹']
-            g_t = df.loc[t_idx, '초기그룹']
+                if best_pair is None:
+                    continue
 
-            df.loc[s_idx, '초기그룹'] = g_t
-            df.loc[t_idx, '초기그룹'] = g_s
+                # ---------- swap ----------
+                s_i, t_i = best_pair
+                g_s = df.loc[s_i, '초기그룹']
+                g_t = df.loc[t_i, '초기그룹']
 
-            print(f"[{col}] Iter {iter_num+1}: {g_s} ↔ {g_t} | best_cost={best_cost:.4f}")
+                df.loc[s_i, '초기그룹'] = g_t
+                df.loc[t_i, '초기그룹'] = g_s
 
+                counts[g_s] -= 1
+                counts[g_t] += 1
+
+                swap_count += 1
+                print(
+                    f"[{col}] Iter {iter_num+1} - Swap {swap_count}: "
+                    f"{g_s} ↔ {g_t} | cost={best_cost:.4f}"
+                )
+
+        if swap_count == 0:
+            break
     return df
 
 ###########################################################

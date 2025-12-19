@@ -1613,15 +1613,9 @@ with tabs[4]:
                 group_assign_df = st.session_state['group_assign_df']
                 relationship_dict = st.session_state['relationship_dict']
                 final_results = []
-
+                group_assign_df.to_excel('디버깅_그룹단위별_관계재배정_df.xlsx', index=False)
                 if groupby_cols:
                     grouped_dfs = dict(tuple(group_assign_df.groupby(groupby_cols)))
-                    # grouped_dfs : 아래와 같은 형태
-                    # {
-                    # 1반: sub_df_1,
-                    # 2반: sub_df_2,
-                    # 3반: sub_df_3
-                    # }
                     for group_key, sub_df in grouped_dfs.items(): # sub_df 는 한 반의 학생들만 담긴 df
                         st.write(f"🔁 관계 기반 재배정 중... 반 단위: {group_key}, 학생 수: {len(sub_df)}")
 
@@ -1632,14 +1626,6 @@ with tabs[4]:
                             for a, rels in relationship_dict.items()
                             if a in valid_students
                         }
-                        # 관계딕셔너리를 반 단위로 필터링한 것
-                        # 같은 반 학생의 관계만 남고, 다른 반 학생 관계는 전부 제거됨
-                        # import pprint
-                        # with open("sub_rel_dict.txt", "w", encoding="utf-8") as f:
-                        #     pprint.pprint(sub_rel_dict, stream=f)
-
-
-
                         if not sub_rel_dict:
                             st.info(f"{group_key}: 관계 정보 없음, 기존 반 유지")
                             final_results.append(sub_df)
@@ -1705,10 +1691,10 @@ with tabs[4]:
                 final_group_assign_df.to_excel('final_group_assign_df_관계재배정이후.xlsx', index=False)
                 st.success("🎉 관계 기반 반 재배정이 완료되었습니다.")
 
-                # 특이분류학생 교환
+                # 특이분류학생 불균형 완화 교환
                 from cost_group_move_v2 import *
-                # special_cols = ['특수학생', '결시생', '운동부', '전출예정']
-                special_cols = ['운동부', '전출예정', '결시생', '특수학생']
+                # special_cols = ['특수학생', '전출예정', '결시생', '운동부']
+                special_cols = ['운동부', '결시생', '특수학생', '전출예정']
                 existing_cols = [col for col in special_cols if col in final_group_assign_df.columns]
                 
                 summary_special = final_group_assign_df.groupby('초기그룹')[existing_cols].sum().reset_index()
@@ -1726,7 +1712,6 @@ with tabs[4]:
 
                 summary = balanced_df.groupby('초기그룹')[existing_cols].sum().reset_index()
                 summary.to_excel('디버깅_특이분류학생_이동후_summary.xlsx', index=False)
-
 
                 # 관계 설정이 걸린 학생들 결과 확인
                 st.subheader("관계 설정이 적용된 학생들 결과 확인")
