@@ -1101,12 +1101,14 @@ def compute_group_cost_after_swap(counts, expected, source_group, target_group):
         cost += diff ** 2
     return cost
 
+
+
 def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_grouped_df, special_cols, relationship_dict, selected_discrete_variable, selected_sort_variable_dict):
     """
     특이분류학생 균등 배치:
     - 출발/도착 그룹은 special_cols 기준 반 별 특이분류학생 수 기대값 대비 편차로 결정
-    - 가상의 교환을 통해 최적의 도착 그룹 탐색한 후,
-    - 학생은 이산형 & 연속형 유사도 최소화 기준으로 탐색 및 교환 진행
+    - 각 출발그룹 기준으로 가능한 모든 학생 swap 후보 평가 후, 비용(그룹 분포 개선 + 학생 유사도)이 최소인 swap 1건을 수행
+    - 학생 교환은 이산형&연속형 변수 유사도를 최소화하는 방향으로 진행
     """
     with open("swap_log.txt", "w", encoding="utf-8") as f:
         f.write("=== Swap Log Start ===\n")
@@ -1119,7 +1121,7 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
         swap_count = 0
         for iter_num in range(max_iter_per_col):
             # 반별 편차 계산
-            summary = df.groupby('초기그룹')[col].sum().reset_index()
+            summary = df.groupby('초기그룹')[special_cols].sum().reset_index()
             expected = summary[col].sum() / summary['초기그룹'].nunique()
             summary['편차'] = summary[col] - expected
             # 출발그룹 선정
@@ -1137,17 +1139,18 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
             #     max_val = summary['편차'].max()
             #     source_groups = summary.loc[summary['편차'] == max_val, '초기그룹'].tolist()
             #### 출발, 도착그룹이 정해지면
-
-            counts = dict(zip(summary['초기그룹'], summary[col]))
+            
+            counts = dict(zip(summary['초기그룹'], summary[special_cols].sum(axis=1))) # 초기그룹별 특이분류학생 합
+            total_expected = summary[special_cols].sum().sum() / summary['초기그룹'].nunique()
             # 그룹 간 교환했을때 그룹 대상인 비용 계산
             group_costs = {} # (출발그룹, 도착그룹) : 비용 (이상치와 비교해서 얼마나 개선되는지, 작을수록 좋음)
             for sg in source_groups:
                 for tg in target_groups:
-                    group_costs[(sg, tg)] = compute_group_cost_after_swap(counts, expected, sg, tg)
+                    group_costs[(sg, tg)] = compute_group_cost_after_swap(counts, total_expected, sg, tg)
             
-            swap_candidates = []
             # 각 출발그룹마다 각 도착그룹의 학생
             for source_group in source_groups:
+                swap_candidates = [] # 출발그룹마다 교환 후보 초기화
                 source_students = df[ # 출발그룹의 True 학생들 중에서 관계그룹 0,-1 인 학생들
                     (df['초기그룹'] == source_group) &
                     (df[col] == True) & # 문자, 숫자형 모두 대응되는지 확인 필요
@@ -1157,6 +1160,7 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                 for s_idx, s_row in source_students.iterrows():
                     s_name = s_row['merge_key']
                     neg_targets = {t for t, v in relationship_dict.get(s_name, {}).items() if v == -1}
+                    
                     for t_group in target_groups:
                         base_group_cost = group_costs.get((source_group, t_group), 0)
                         target_students = df[
@@ -1172,7 +1176,7 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                             disc_cost = compute_swap_discrete_cost(s_row, t_row, selected_discrete_variable) # 학생 교환 시 이산형 상태 유사도 비용
                             cont_cost = compute_swap_continuous_cost(s_row, t_row, cont_vars) # 학생 교환 시 연속형 상태 유사도 비용
                             sim_cost = w_discrete * disc_cost + w_continuous * cont_cost
-                            total_cost = base_group_cost + sim_cost
+                            total_cost = 200*base_group_cost + sim_cost
                             swap_candidates.append({
                                 "sg": source_group,
                                 "tg": t_group,
@@ -1182,62 +1186,26 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                                 "t_name": t_row['merge_key'],
                                 "total_cost": total_cost
                             })
-
-            if not swap_candidates:
-                print(f"[{col}] iter {iter_num}: swap 후보 없음 → 종료")
-                break
-            
-            # 각 출발그룹마다 최적의 swap
-            # 이전에 교환된 학생은 이후 교환 후보에서 제외
-            used_students = set()
-            iter_swap_count = 0
-
-            for sg in source_groups:
-                sg_candidates = [
-                    c for c in swap_candidates
-                    if c["sg"] == sg
-                    and c["s_idx"] not in used_students
-                    and c["t_idx"] not in used_students
-                ]
-
-                if not sg_candidates:
+                if not swap_candidates:
                     continue
+                best_swap = min(swap_candidates, key=lambda x: x["total_cost"])
+                
+                sg = best_swap["sg"]
+                tg = best_swap["tg"]
+                s_idx = best_swap["s_idx"]
+                t_idx = best_swap["t_idx"]
 
-                best_swap = min(sg_candidates, key=lambda x: x["total_cost"])
-
-                s_i = best_swap["s_idx"]
-                t_i = best_swap["t_idx"]
-                s_name = best_swap["s_name"]
-                t_name = best_swap["t_name"]
-                best_cost = best_swap["total_cost"]
-
-                g_s = df.loc[s_i, '초기그룹']
-                g_t = df.loc[t_i, '초기그룹']
-
-                # swap 실행
-                df.loc[s_i, '초기그룹'] = g_t
-                df.loc[t_i, '초기그룹'] = g_s
-
-                used_students.update([s_i, t_i])
+                # swap 진행
+                df.loc[s_idx, '초기그룹'] = tg
+                df.loc[t_idx, '초기그룹'] = sg
 
                 swap_count += 1
-                iter_swap_count += 1
 
                 with open("swap_log.txt", "a", encoding="utf-8") as f:
                     f.write(
-                        f"[{col}] Iter {iter_num+1} Swap {iter_swap_count}: \n"
-                        f"{s_name}({g_s}→{g_t}) ↔ {t_name}({g_t}→{g_s}), cost={best_cost:.4f}\n"
-                        f"[{col}] Iter {iter_num+1} - Swap {swap_count} 완료\n"
+                        f"[{col}] Iter {iter_num} | "
+                        f"{best_swap['s_name']} ({sg}→{tg}) ↔ "
+                        f"{best_swap['t_name']} ({tg}→{sg}) | "
+                        f"cost={best_swap['total_cost']:.4f}\n"
                     )
-            if iter_swap_count == 0:
-                print(f"[{col}] Iter {iter_num+1}: swap 실패 → 종료")
-                break
-
-        with open("swap_log.txt", "a", encoding="utf-8") as f:
-            f.write(
-                f"Iter {iter_num+1} 완료 | "
-                f"iter swaps = {iter_swap_count} | "
-                f"total swaps = {swap_count}\n"
-            )
-
     return df

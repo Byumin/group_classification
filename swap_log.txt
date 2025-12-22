@@ -1,11 +1,3 @@
 === Swap Log Start ===
-[운동부] Iter 1 Swap 1: 
-108032김서현(9.0→6.0) ↔ 103132최윤정(6.0→9.0), cost=2.5000
-[운동부] Iter 1 - Swap 1 완료
-Iter 2 완료 | iter swaps = 1 | total swaps = 1
-Iter 1 완료 | iter swaps = 1 | total swaps = 0
-[특수학생] Iter 1 Swap 1: 
-107072이서현(6.0→9.0) ↔ 103132최윤정(9.0→6.0), cost=0.0000
-[특수학생] Iter 1 - Swap 1 완료
-Iter 2 완료 | iter swaps = 1 | total swaps = 1
-Iter 1 완료 | iter swaps = 1 | total swaps = 0
+[운동부] Iter 0 | 101181김시몬 (1.0→0.0) ↔ 101201배준서 (0.0→1.0) | cost=1920.0000
+[결시생] Iter 0 | 110311부유민 (7.0→3.0) ↔ 101251이지학 (3.0→7.0) | cost=1220.0000
