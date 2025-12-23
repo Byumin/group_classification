@@ -1116,6 +1116,7 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
     cont_vars = list(selected_sort_variable_dict.keys())
     same_class_students = {student for student, relations in relationship_dict.items() if 1 in relations.values()}
 
+    swapped_students = set() # 이미 교환된 학생 기록
     for col in special_cols:
         print(f"\n===== [{col}] 유사도 기반 swap 시작 =====")
         swap_count = 0
@@ -1154,7 +1155,8 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                 source_students = df[ # 출발그룹의 특정 특이분류 학생들 중에서 관계그룹 0,-1 인 학생들
                     (df['초기그룹'] == source_group) &
                     (df[col] == 1) & # 문자형은 "1"로 수정 필요
-                    (~df['merge_key'].isin(same_class_students)) # 관계그룹 0,-1 인 학생들
+                    (~df['merge_key'].isin(same_class_students)) & # 관계그룹 0,-1 인 학생들
+                    (~df['merge_key'].isin(swapped_students)) # 이미 교환된 학생 제외
                 ]
 
                 for s_idx, s_row in source_students.iterrows():
@@ -1166,7 +1168,8 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                         target_students = df[ # 도착그룹의 특이분류학생이 아닌 일반 학생들 중에서 관계그룹 -1이 아닌 학생들
                             (df['초기그룹'] == t_group) &
                             (df[col] == 0) & # 문자형은 "0"으로 수정 필요
-                            (~df['merge_key'].isin(neg_targets))
+                            (~df['merge_key'].isin(neg_targets)) &
+                            (~df['merge_key'].isin(swapped_students)) # 이미 교환된 학생 제외
                         ]
                         if target_students.empty:
                             continue
@@ -1199,6 +1202,11 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                 df.loc[s_idx, '초기그룹'] = tg
                 df.loc[t_idx, '초기그룹'] = sg
 
+                # 교환된 학생 기록
+                swapped_students.add(best_swap['s_name'])
+                swapped_students.add(best_swap['t_name'])
+                print("이미 교환된 학생 : ", swapped_students)
+                
                 swap_count += 1
 
                 with open("swap_log.txt", "a", encoding="utf-8") as f:
