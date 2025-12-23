@@ -1151,9 +1151,9 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
             # 각 출발그룹마다 각 도착그룹의 학생
             for source_group in source_groups:
                 swap_candidates = [] # 출발그룹마다 교환 후보 초기화
-                source_students = df[ # 출발그룹의 True 학생들 중에서 관계그룹 0,-1 인 학생들
+                source_students = df[ # 출발그룹의 특정 특이분류 학생들 중에서 관계그룹 0,-1 인 학생들
                     (df['초기그룹'] == source_group) &
-                    (df[col] == True) & # 문자, 숫자형 모두 대응되는지 확인 필요
+                    (df[col] == 1) & # 문자형은 "1"로 수정 필요
                     (~df['merge_key'].isin(same_class_students)) # 관계그룹 0,-1 인 학생들
                 ]
 
@@ -1163,9 +1163,9 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                     
                     for t_group in target_groups:
                         base_group_cost = group_costs.get((source_group, t_group), 0)
-                        target_students = df[
+                        target_students = df[ # 도착그룹의 특이분류학생이 아닌 일반 학생들 중에서 관계그룹 -1이 아닌 학생들
                             (df['초기그룹'] == t_group) &
-                            (df[col] == False) &
+                            (df[col] == 0) & # 문자형은 "0"으로 수정 필요
                             (~df['merge_key'].isin(neg_targets))
                         ]
                         if target_students.empty:
@@ -1176,7 +1176,7 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                             disc_cost = compute_swap_discrete_cost(s_row, t_row, selected_discrete_variable) # 학생 교환 시 이산형 상태 유사도 비용
                             cont_cost = compute_swap_continuous_cost(s_row, t_row, cont_vars) # 학생 교환 시 연속형 상태 유사도 비용
                             sim_cost = w_discrete * disc_cost + w_continuous * cont_cost
-                            total_cost = 200*base_group_cost + sim_cost
+                            total_cost = 200*base_group_cost + sim_cost # 가중치 부여해 그룹 분포 개선을 우선시
                             swap_candidates.append({
                                 "sg": source_group,
                                 "tg": t_group,
