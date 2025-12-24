@@ -1115,6 +1115,9 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
     df = init_grouped_df.copy()
     cont_vars = list(selected_sort_variable_dict.keys())
     same_class_students = {student for student, relations in relationship_dict.items() if 1 in relations.values()}
+    df['special_sum'] = df[special_cols].sum(axis=1)
+    multi_special_students = set(df.loc[df['special_sum'] >= 2, 'merge_key']) # 다중 특이분류 학생
+    print("다중 특이분류 학생 >>> ", multi_special_students)
 
     swapped_students = set() # 이미 교환된 학생 기록
     for col in special_cols:
@@ -1158,6 +1161,12 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                     (~df['merge_key'].isin(same_class_students)) & # 관계그룹 0,-1 인 학생들
                     (~df['merge_key'].isin(swapped_students)) # 이미 교환된 학생 제외
                 ]
+                # 다중 특이분류학생이 있으면 필터링
+                multi_filtered_source_students = source_students[(~source_students['merge_key'].isin(multi_special_students))] # 다중 특이분류학생 제거한 후보
+                if not multi_filtered_source_students.empty:
+                    source_students = multi_filtered_source_students
+                else: # 만약 없으면 원래 source_students 유지
+                    pass
 
                 for s_idx, s_row in source_students.iterrows():
                     s_name = s_row['merge_key']
@@ -1167,7 +1176,7 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                         base_group_cost = group_costs.get((source_group, t_group), 0)
                         target_students = df[ # 도착그룹의 특이분류학생이 아닌 일반 학생들 중에서 관계그룹 -1이 아닌 학생들
                             (df['초기그룹'] == t_group) &
-                            (df[col] == 0) & # 문자형은 "0"으로 수정 필요
+                            (df['special_sum'] == 0) & # 일반 학생 # 문자형은 수정 필요
                             (~df['merge_key'].isin(neg_targets)) &
                             (~df['merge_key'].isin(swapped_students)) # 이미 교환된 학생 제외
                         ]
