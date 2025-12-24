@@ -1139,9 +1139,9 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
             if source_groups and not target_groups:
                 min_val = summary['편차'].min()
                 target_groups = summary.loc[summary['편차'] == min_val, '초기그룹'].tolist()
-            # elif target_groups and not source_groups:
-            #     max_val = summary['편차'].max()
-            #     source_groups = summary.loc[summary['편차'] == max_val, '초기그룹'].tolist()
+            elif target_groups and not source_groups:
+                max_val = summary['편차'].max()
+                source_groups = summary.loc[summary['편차'] == max_val, '초기그룹'].tolist()
             #### 출발, 도착그룹이 정해지면
             
             counts = dict(zip(summary['초기그룹'], summary[special_cols].sum(axis=1))) # 초기그룹별 특이분류학생 합
@@ -1153,8 +1153,8 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                     group_costs[(sg, tg)] = compute_group_cost_after_swap(counts, total_expected, sg, tg)
             
             # 각 출발그룹마다 각 도착그룹의 학생
+            swap_candidates = [] # 출발그룹마다 교환 후보 초기화
             for source_group in source_groups:
-                swap_candidates = [] # 출발그룹마다 교환 후보 초기화
                 source_students = df[ # 출발그룹의 특정 특이분류 학생들 중에서 관계그룹 0,-1 인 학생들
                     (df['초기그룹'] == source_group) &
                     (df[col] == 1) & # 문자형은 "1"로 수정 필요
@@ -1198,31 +1198,31 @@ def cost_group_swap_special_v2(max_iter_per_col, w_discrete, w_continuous, init_
                                 "t_name": t_row['merge_key'],
                                 "total_cost": total_cost
                             })
-                if not swap_candidates:
-                    continue
-                best_swap = min(swap_candidates, key=lambda x: x["total_cost"])
-                
-                sg = best_swap["sg"]
-                tg = best_swap["tg"]
-                s_idx = best_swap["s_idx"]
-                t_idx = best_swap["t_idx"]
+            if not swap_candidates:
+                continue
+            best_swap = min(swap_candidates, key=lambda x: x["total_cost"])
+            
+            sg = best_swap["sg"]
+            tg = best_swap["tg"]
+            s_idx = best_swap["s_idx"]
+            t_idx = best_swap["t_idx"]
 
-                # swap 진행
-                df.loc[s_idx, '초기그룹'] = tg
-                df.loc[t_idx, '초기그룹'] = sg
+            # swap 진행
+            df.loc[s_idx, '초기그룹'] = tg
+            df.loc[t_idx, '초기그룹'] = sg
 
-                # 교환된 학생 기록
-                swapped_students.add(best_swap['s_name'])
-                swapped_students.add(best_swap['t_name'])
-                print("이미 교환된 학생 : ", swapped_students)
-                
-                swap_count += 1
+            # 교환된 학생 기록
+            swapped_students.add(best_swap['s_name'])
+            swapped_students.add(best_swap['t_name'])
+            print("이미 교환된 학생 : ", swapped_students)
+            
+            swap_count += 1
 
-                with open("swap_log.txt", "a", encoding="utf-8") as f:
-                    f.write(
-                        f"[{col}] Iter {iter_num} | "
-                        f"{best_swap['s_name']} ({sg}→{tg}) ↔ "
-                        f"{best_swap['t_name']} ({tg}→{sg}) | "
-                        f"cost={best_swap['total_cost']:.4f}\n"
-                    )
+            with open("swap_log.txt", "a", encoding="utf-8") as f:
+                f.write(
+                    f"[{col}] Iter {iter_num} | "
+                    f"{best_swap['s_name']} ({sg}→{tg}) ↔ "
+                    f"{best_swap['t_name']} ({tg}→{sg}) | "
+                    f"cost={best_swap['total_cost']:.4f}\n"
+                )
     return df
