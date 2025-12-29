@@ -962,7 +962,7 @@ with tabs[3]:
                     group_assign_df['초기그룹'] = group_assign
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
-                    group_assign_df = cost_group_move_v4(100, 0.1, 100, 100, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move_v4(100, -np.inf, 100, 50, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 반 분류가 완료되었습니다.")
                     #group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False) #! 초기 그룹 배정 저장
@@ -984,7 +984,7 @@ with tabs[3]:
                         # 초기 group_assign과 subject_df 병합
                         subject_df['초기그룹'] = group_assign
                         # cost 함수 기반으로 그룹 배정 최적화
-                        subject_group_assign_df = cost_group_move_v4(100, 0.1, 100, 100, subject_df, selected_discrete_variable, selected_sort_variable_dict)
+                        subject_group_assign_df = cost_group_move_v4(100, -np.inf, 100, 50, subject_df, selected_discrete_variable, selected_sort_variable_dict)
                         # 그룹 번호 조정은 cost_group_move_v4 후에 처리
                         subject_group_assign_df['초기그룹'] = subject_group_assign_df['초기그룹'] + start_group_number
                         group_assign_df = pd.concat([group_assign_df, subject_group_assign_df], axis=0)
@@ -1014,7 +1014,7 @@ with tabs[3]:
                             selected_discrete_variable.remove("성별_명렬표")
                         else:
                             pass
-                        gender_group_assign_df = cost_group_move_v4(100, 0.1, 100, 100, gender_df, selected_discrete_variable, selected_sort_variable_dict)
+                        gender_group_assign_df = cost_group_move_v4(100, -np.inf, 100, 50, gender_df, selected_discrete_variable, selected_sort_variable_dict)
                         # 그룹 번호 조정은 cost_group_move_v4 후에 처리
                         gender_group_assign_df['초기그룹'] = gender_group_assign_df['초기그룹'] + start_group_number
                         group_assign_df = pd.concat([group_assign_df, gender_group_assign_df], axis=0)
@@ -1044,7 +1044,7 @@ with tabs[3]:
                             selected_discrete_variable.remove("성별_명렬표")
                         else:
                             pass
-                        gender_subject_group_assign_df = cost_group_move_v4(100, 0.1, 100, 100, gender_subject_df, selected_discrete_variable, selected_sort_variable_dict)
+                        gender_subject_group_assign_df = cost_group_move_v4(100, -np.inf, 100, 50, gender_subject_df, selected_discrete_variable, selected_sort_variable_dict)
                         # 그룹 번호 조정은 cost_group_move_v4 후에 처리
                         gender_subject_group_assign_df['초기그룹'] = gender_subject_group_assign_df['초기그룹'] + start_group_number
                         group_assign_df = pd.concat([group_assign_df, gender_subject_group_assign_df], axis=0)
@@ -1067,7 +1067,7 @@ with tabs[3]:
                     st.session_state['group_assign_df'] = group_assign_df
                     # cost 함수 기반으로 그룹 배정 최적화
                     print('초기 배정 병합 후 이산형 변수 열 확인', )
-                    group_assign_df = cost_group_move_v4(100, 0.1, 100, 100, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
+                    group_assign_df = cost_group_move_v4(100, -np.inf, 100, 50, group_assign_df, selected_discrete_variable, selected_sort_variable_dict)
                     st.session_state['group_assign_df'] = group_assign_df
                     st.success("초기 반 분류가 완료되었습니다.")
                     #group_assign_df.to_excel('group_assign_df_관계배정전.xlsx', index=False)
@@ -1088,7 +1088,7 @@ with tabs[3]:
                         # 초기 group_assign과 subject_df 병합
                         subject_df['초기그룹'] = subject_group_assign
                         # cost 함수 기반으로 그룹 배정 최적화
-                        subject_group_assign_df = cost_group_move_v4(100, 0.1, 100, 100, subject_df, selected_discrete_variable, selected_sort_variable_dict)
+                        subject_group_assign_df = cost_group_move_v4(100, -np.inf, 100, 50, subject_df, selected_discrete_variable, selected_sort_variable_dict)
                         # 그룹 번호 조정은 cost_group_move_v4 후에 처리
                         subject_group_assign_df['초기그룹'] = subject_group_assign_df['초기그룹'] + start_group_number
                         group_assign_df = pd.concat([group_assign_df, subject_group_assign_df], axis=0)
@@ -1457,7 +1457,7 @@ with tabs[3]:
             freq_df = (group_assign_df.groupby(groupby_cols)[existing_cols].sum().astype(int))
             st.markdown("##### 반 별 배정된 특이분류학생(특수학생, 전출예정, 운동부, 결시생 등) 현황")
             st.dataframe(freq_df.reset_index().assign(초기그룹=lambda x: x['초기그룹'] + 1), use_container_width=True, hide_index=True)
-            group_assign_df.to_excel('group_assign_df_초기반분류완료.xlsx', index=False) #! 초기 반 분류 완료 저장
+            #group_assign_df.to_excel('group_assign_df_초기반분류완료.xlsx', index=False) #! 초기 반 분류 완료 저장
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -1530,7 +1530,7 @@ with tabs[4]:
         st.markdown("#### 저장된 관계 요약 및 관리")
         if st.session_state['relationship_dict']:
             rel_df = pd.DataFrame.from_dict(st.session_state['relationship_dict'], orient='index').fillna(0)
-            rel_df.to_excel('저장된 관계 요약 및 관리.xlsx', index=False)
+            #rel_df.to_excel('저장된 관계 요약 및 관리.xlsx', index=False)
             st.dataframe(rel_df, use_container_width=True)
 
             col1, col2 = st.columns([1, 1])
@@ -1613,7 +1613,7 @@ with tabs[4]:
                 group_assign_df = st.session_state['group_assign_df']
                 relationship_dict = st.session_state['relationship_dict']
                 final_results = []
-                group_assign_df.to_excel('디버깅_그룹단위별_관계재배정_df.xlsx', index=False)
+                #group_assign_df.to_excel('디버깅_그룹단위별_관계재배정_df.xlsx', index=False)
                 if groupby_cols:
                     grouped_dfs = dict(tuple(group_assign_df.groupby(groupby_cols)))
                     for group_key, sub_df in grouped_dfs.items(): # sub_df 는 한 반의 학생들만 담긴 df
@@ -1650,7 +1650,7 @@ with tabs[4]:
 
                         # 그룹 내 균형 조정
                         final_df = cost_group_move_v2(
-                            50, 0.01, 100, 1,
+                            50, 0.01, 100, 100,
                             final_df,
                             selected_discrete_variable,
                             selected_sort_variable_dict
@@ -1678,7 +1678,7 @@ with tabs[4]:
                     )
                     final_df = merge_optimal_assignments(remaining_df, best_assignment, relationship_group_df_dict)
                     final_df = cost_group_move_v2(
-                        50, 0.01, 100, 1,
+                        50, 0.01, 100, 100,
                         final_df,
                         selected_discrete_variable,
                         selected_sort_variable_dict
@@ -1688,17 +1688,16 @@ with tabs[4]:
                 # 결과 병합 및 저장
                 final_group_assign_df = pd.concat(final_results, ignore_index=True)
                 st.session_state['final_group_assign_df'] = final_group_assign_df
-                final_group_assign_df.to_excel('final_group_assign_df_관계재배정이후.xlsx', index=False)
-                st.success("🎉 관계 기반 반 재배정이 완료되었습니다.")
+                #final_group_assign_df.to_excel('final_group_assign_df_관계재배정이후.xlsx', index=False)
+                #st.success("관계 기반 반 재배정이 완료되었습니다.")
 
                 # 특이분류학생 불균형 완화 교환
-                from cost_group_move_v2 import *
-                # special_cols = ['특수학생', '전출예정', '결시생', '운동부']
+                from cost_group_swap_special_student import cost_group_swap_special_v2
                 special_cols = ['운동부', '결시생', '특수학생', '전출예정']
                 existing_cols = [col for col in special_cols if col in final_group_assign_df.columns]
                 
                 summary_special = final_group_assign_df.groupby('초기그룹')[existing_cols].sum().reset_index()
-                summary_special.to_excel('디버깅_관계재배정후_특이분류학생_summary.xlsx', index=False)
+                #summary_special.to_excel('디버깅_관계재배정후_특이분류학생_summary.xlsx', index=False)
 
                 final_results = []
                 if groupby_cols:
@@ -1722,11 +1721,12 @@ with tabs[4]:
                         relationship_dict,
                         selected_discrete_variable,
                         selected_sort_variable_dict)
+                st.session_state['final_group_assign_df'] = final_group_assign_df
+                st.success("관계 기반 반 재배정이 완료되었습니다.")
 
-                final_group_assign_df.to_excel('디버깅_특이분류학생_이동후.xlsx', index=False)
-
+                #final_group_assign_df.to_excel('디버깅_특이분류학생_이동후.xlsx', index=False)
                 summary = final_group_assign_df.groupby('초기그룹')[existing_cols].sum().reset_index()
-                summary.to_excel('디버깅_특이분류학생_이동후_summary.xlsx', index=False)
+                #summary.to_excel('디버깅_특이분류학생_이동후_summary.xlsx', index=False)
 
                 # 관계 설정이 걸린 학생들 결과 확인
                 st.subheader("관계 설정이 적용된 학생들 결과 확인")

@@ -1,2 +1,3 @@
 before_move_target_diff_matrix.npz
 *.pyc
+*.ipynb

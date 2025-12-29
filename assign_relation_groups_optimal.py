@@ -225,7 +225,7 @@ def assign_relation_groups_optimal(group_assign_df, relationship_group_dict, rel
     import pandas as pd
     from copy import deepcopy
     from scipy.optimize import linear_sum_assignment
-    from cost_group_move import compute_group_discrete_freq, compute_group_total_cost, compute_ideal_discrete_freq
+    from cost_group_move_v2 import compute_group_discrete_freq, compute_group_total_cost, compute_ideal_discrete_freq
 
     relation_group_keys = list(relationship_group_df_dict.keys())
     group_candidates = list(group_assign_df['초기그룹'].unique())
