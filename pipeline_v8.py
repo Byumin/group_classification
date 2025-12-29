@@ -1759,7 +1759,15 @@ with tabs[4]:
                             학생A_그룹=relation_summary_df['학생A_그룹']+1,
                             학생B_그룹=relation_summary_df['학생B_그룹']+1
                         ), use_container_width=True)
-
+                
+                # 특이분류 학생 현황 재표시
+                st.subheader("관계 재배정 후 특이분류학생 현황")
+                groupby_cols = ['초기그룹'] + groupby_cols if groupby_cols else ['초기그룹']
+                final_group_assign_df = st.session_state['final_group_assign_df']
+                special_cols = ['특수학생', '전출예정', '운동부', '결시생']
+                existing_cols = [col for col in special_cols if col in final_group_assign_df.columns]
+                freq_df = (final_group_assign_df.groupby(groupby_cols)[existing_cols].sum().astype(int))
+                st.dataframe(freq_df.reset_index().assign(초기그룹=lambda x: x['초기그룹'] + 1), use_container_width=True, hide_index=True)
             else:
                 st.warning("먼저 반 배정(group_assign_df)을 생성해주세요.")
     else:
