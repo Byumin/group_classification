@@ -1105,6 +1105,8 @@ with tabs[3]:
             ## 특수학생 그룹별로 균일하게 배치
             ## 특수학생이 결시할 경우 결시생이 아닌 특수학생 취급
             group_assign_df = st.session_state['group_assign_df']
+            group_assign_df['그룹고정'] = False
+            st.session_state['group_assign_df'] = group_assign_df
             if st.session_state['special_student_handling'] == '예' and '특수학생' in group_assign_df.columns:
                 try:
                     # 케이스별 groupby로 기준 설정
@@ -1126,7 +1128,7 @@ with tabs[3]:
                         groupby_cols = []
                     # 그룹 단위별 특수학생 배정
                     group_assign_df = st.session_state['group_assign_df'] # 그룹고정 열 포함된 데이터프레임
-                    group_assign_df['그룹고정'] = False
+                    # group_assign_df['그룹고정'] = False
                     special_student_df = st.session_state['special_student_df'] # 앞에서 분리한 특수학생 데이터프레임
                     special_student_df['그룹고정'] = False
                     special_assign_results = []
