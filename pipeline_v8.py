@@ -880,7 +880,7 @@ with tabs[3]:
     if st.button("반 분류 시작"):
         try:
             if all(k in st.session_state for k in ['merged_df', 'selected_algorithm', 'selected_sort_variable_dict', 'selected_discrete_variable', 'sex_classification', 'group_count', 'subject_based_classification', 'absent_student_handling', 'special_student_handling', 'school_based_classification']):
-                from init_group_assign_v2 import tuple_from_df, suitable_bin_value, init_group_assign_v2
+                from init_group_assign_v2 import tuple_from_df, init_group_assign_v2
                 from cost_group_move_v4 import compute_ideal_discrete_freq, cost_group_move_v4, compute_group_discrete_freq, compute_group_total_cost, compute_group_diff_and_sign, compute_continuous_cost, compute_discrete_cost
                 # 병합된 데이터프레임 불러오기
                 df = st.session_state['merged_df'] # 앞에서 결시생, 동명이인 처리까지 완료된 데이터프레임
@@ -953,7 +953,6 @@ with tabs[3]:
                 if st.session_state['sex_classification'] in ['남학교', '여학교'] and st.session_state['subject_based_classification'] == '아니오':
                     print('남학교 or 여학교, 합반, 선택과목 없음으로 성별 비율 균형 고려하여 반 배정 시작')
                     # 적절한 bin_value 찾기
-                    #sorted_idx, sorted_x, final_bin_value = suitable_bin_value(tuples, st.session_state['group_count'])
                     # 초기 그룹 배정
                     group_assign = init_group_assign_v2(tuples, st.session_state['group_count'])
                     #group_assign = [int(g_n)+1 for g_n in group_assign]
@@ -979,7 +978,6 @@ with tabs[3]:
                         subject_group_count = st.session_state['subject_group_counts'].get(subject, 0) # 과목별 그룹 수 가지고오기 (ex 한문 2개, 일본어 1개 등)
                         st.info(f"선택과목 : {subject}, 학생 수 : {subject_df.shape[0]}, 할당된 반 수 : {subject_group_count}")
                         subject_tuples = tuple_from_df(subject_df, col_names) # 정렬할 변수 튜플화
-                        #sorted_idx, sorted_x, final_bin_value = suitable_bin_value(subject_tuples, subject_group_count) # 과목별 분리된 데이터에서 적절한 bin_value 탐색
                         group_assign = init_group_assign_v2(subject_tuples, subject_group_count) # 과목별 초기 그룹 배정
                         # 초기 group_assign과 subject_df 병합
                         subject_df['초기그룹'] = group_assign
@@ -1005,7 +1003,6 @@ with tabs[3]:
                         gender_group_count = st.session_state['male_class_count'] if gender == '1' else st.session_state['female_class_count'] # 성별에 따른 그룹 수 할당
                         st.info(f"성별 : {gender}, 학생 수 : {gender_df.shape[0]}, 할당된 반 수 : {gender_group_count}")
                         gender_tuples = tuple_from_df(gender_df, col_names)
-                        #sorted_idx, sorted_x, final_bin_value = suitable_bin_value(gender_tuples, gender_group_count)
                         gender_group_assign = init_group_assign_v2(gender_tuples, gender_group_count)
                         # group_assign과 gender_df 병합
                         gender_df['초기그룹'] = gender_group_assign
@@ -1035,7 +1032,6 @@ with tabs[3]:
                         gender_subject_group_count = st.session_state['gender_subject_group_counts'].get((f'{gender}_{subject}'), 0)
                         st.info(f"성별: {gender}, 선택과목 : {subject}, 학생수: {gender_subject_df.shape[0]}, 할당된 반 수 : {gender_subject_group_count}")
                         gender_tuples = tuple_from_df(gender_subject_df, col_names)
-                        #sorted_idx, sorted_x, final_bin_value = suitable_bin_value(gender_tuples, gender_subject_group_count)
                         group_assign = init_group_assign_v2(gender_tuples, gender_subject_group_count)
                         # 초기 group_assign과 gender_subject_df 병합
                         gender_subject_df['초기그룹'] = group_assign
@@ -1055,8 +1051,6 @@ with tabs[3]:
 
                 elif st.session_state['sex_classification'] == '합반' and st.session_state['subject_based_classification'] == '아니오':
                     print('남여공학, 합반, 선택과목 없음으로 성별 비율 균형 고려하여 반 배정 시작')
-                    # 적절한 bin_value 찾기
-                    #sorted_idx, sorted_x, final_bin_value = suitable_bin_value(tuples, st.session_state['group_count'])
                     # 초기 그룹 배정
                     group_assign = init_group_assign_v2(tuples, st.session_state['group_count'])
                     #group_assign = [int(g_n)+1 for g_n in group_assign] # 그룹 번호 1부터 시작하도록 조정 -> 행렬화 위해 0부터 시작하는것으로 임시변경
@@ -1083,7 +1077,6 @@ with tabs[3]:
                         subject_group_count = st.session_state['subject_group_counts'].get(subject, 0) # 과목별 그룹 수 가지고오기
                         st.info(f"선택과목: {subject}, 학생 수: {subject_df.shape[0]}, 할당된 반 수: {subject_group_count}")
                         subject_tuples = tuple_from_df(subject_df, col_names)
-                        #sorted_idx, sorted_x, final_bin_value = suitable_bin_value(subject_tuples, subject_group_count)
                         subject_group_assign = init_group_assign_v2(subject_tuples, subject_group_count)
                         # 초기 group_assign과 subject_df 병합
                         subject_df['초기그룹'] = subject_group_assign
@@ -1128,7 +1121,6 @@ with tabs[3]:
                         groupby_cols = []
                     # 그룹 단위별 특수학생 배정
                     group_assign_df = st.session_state['group_assign_df'] # 그룹고정 열 포함된 데이터프레임
-                    # group_assign_df['그룹고정'] = False
                     special_student_df = st.session_state['special_student_df'] # 앞에서 분리한 특수학생 데이터프레임
                     special_student_df['그룹고정'] = False
                     special_assign_results = []
