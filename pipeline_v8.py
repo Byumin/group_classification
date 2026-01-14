@@ -866,15 +866,15 @@ with tabs[3]:
         help="학생 명렬표에 전출 예정 학생에 대한 정보가 있는 경우 처리 가능합니다."
     )
     st.session_state['transfer_student_handling'] = transfer_student_handling
-    # 출신 학교 기반 분류
-    st.subheader("출신 학교 기반 분류 여부 (추후 개발)")
-    school_based_classification = st.radio(
-        "출신 학교을 고려해 반 별로 균형있게 배정하시겠습니까?",
-        options=["예", "아니오"],
-        index=1,
-        help="학생 명렬표에 출신 학교에 대한 정보가 있는 경우 처리 가능합니다."
-    )
-    st.session_state['school_based_classification'] = school_based_classification
+    # # 출신 학교 기반 분류
+    # st.subheader("출신 학교 기반 분류 여부 (추후 개발)")
+    # school_based_classification = st.radio(
+    #     "출신 학교을 고려해 반 별로 균형있게 배정하시겠습니까?",
+    #     options=["예", "아니오"],
+    #     index=1,
+    #     help="학생 명렬표에 출신 학교에 대한 정보가 있는 경우 처리 가능합니다."
+    # )
+    # st.session_state['school_based_classification'] = school_based_classification
 
     # if st.session_state.get('group_count', 0) > 0:
     #     full_group_names = []
@@ -887,7 +887,7 @@ with tabs[3]:
     
     if st.button("반 분류 시작"):
         try:
-            if all(k in st.session_state for k in ['merged_df', 'selected_algorithm', 'selected_sort_variable_dict', 'selected_discrete_variable', 'sex_classification', 'group_count', 'subject_based_classification', 'absent_student_handling', 'special_student_handling', 'school_based_classification']):
+            if all(k in st.session_state for k in ['merged_df', 'selected_algorithm', 'selected_sort_variable_dict', 'selected_discrete_variable', 'sex_classification', 'group_count', 'subject_based_classification', 'absent_student_handling', 'special_student_handling']): #, 'school_based_classification']):
                 from init_group_assign_v2 import tuple_from_df, init_group_assign_v2
                 from cost_group_move_v4 import compute_ideal_discrete_freq, cost_group_move_v4, compute_group_discrete_freq, compute_group_total_cost, compute_group_diff_and_sign, compute_continuous_cost, compute_discrete_cost
                 # 병합된 데이터프레임 불러오기
