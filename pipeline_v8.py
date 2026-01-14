@@ -137,8 +137,6 @@ if existing_type in ['A Type-능력', 'B Type-인성', 'C Type-학습', 'A+B Typ
         st.session_state['raw_df_1'] = raw_df_1.replace('-', np.nan)
         st.session_state['raw_df_2'] = raw_df_2.replace('-', np.nan)
         print(raw_df_2.columns)
-        #raw_df_1.to_excel("raw_df_1_test.xlsx", index=False)
-        #raw_df_2.to_excel("raw_df_2_test.xlsx", index=False)
         # 두 검사 결과 데이터프레임 병합
         raw_df_1['merge_key'] = raw_df_1['학년반번호'].astype(str) + raw_df_1['성별'].astype(str) + raw_df_1['이름'].astype(str)
         raw_df_2['merge_key'] = raw_df_2['학년반번호'].astype(str) + raw_df_2['성별'].astype(str) + raw_df_2['이름'].astype(str)
@@ -398,6 +396,16 @@ try:
     else:
         st.sidebar.warning("변수를 선택해주세요.")
     # 범주형 변수 선택
+    #! 출신학교에 따른 반별 균형 편성 기능 추가
+    student_df = st.session_state.get('student_df', pd.DataFrame())
+    if "출신학교" in student_df.columns:
+        cols_temp = st.session_state.get('cols', [])
+        if not cols_temp:  # cols_temp가 비어있는 경우
+            ValueError("검사 결과 데이터프레임이 업로드되지 않았거나 비어 있습니다. 전역 변수 선택을 진행할 수 없습니다.")
+        else:
+            cols_temp.insert(cols_temp.index("이름")+1, "출신학교")
+    else:
+        pass
     discrete_variable = st.sidebar.multiselect(
         "범주형 변수를 선택하세요",
         options=st.session_state.get('cols', []) if 'cols' in st.session_state else st.session_state['discrete_variable_default'],
