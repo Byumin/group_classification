@@ -511,11 +511,14 @@ def cost_group_move_v2(max_iter, tolerance, w_discrete, w_continuous, init_group
         if not selected_discrete_variable :
             print("이산형 변수가 선택되지 않아 이산형 비용 함수 계산을 건너뜁니다.")
             selected_sort_variable = list(selected_sort_variable_dict.keys()) # selected_sort_variable_dict : 딕셔너리 형태로 입력됨 (오른쪽으로 갈수록 우선순위 높음)
+            init_grouped_df['그룹크기'] = 1
+            selected_discrete_variable = ['그룹크기'] # 더미 변수 추가
 
             # 초기 그룹 설정에서의 비용 계산(갱신용), 연속형 변수와 그룹 크기만 반영
-            prev_group_mean = [init_grouped_df[init_grouped_df['초기그룹'] == g][selected_sort_variable].mean() for g in init_grouped_df['초기그룹'].unique()]
+            prev_group_mean = init_grouped_df.groupby('초기그룹')[selected_sort_variable].mean()
             prev_pop_mean = init_grouped_df[selected_sort_variable].mean()
-            prev_diff_cost = sum([abs(gm - prev_pop_mean) for gm in prev_group_mean]) # 그룹 별 평균과 전체 평균의 차이의 절대값 합 -> 값이 클수록 불균형
+            mean_diff_df = (prev_group_mean - prev_pop_mean).abs()
+            prev_diff_cost = mean_diff_df.sum().sum() # 그룹 별 평균과 전체 평균의 차이의 절대값 합 -> 값이 클수록 불균형
             prev_mean_size = init_grouped_df.groupby('초기그룹').size().mean() # 이상적인 그룹 크기
             prev_size_cost = sum([abs(len(init_grouped_df[init_grouped_df['초기그룹'] == g]) - prev_mean_size) for g in init_grouped_df['초기그룹'].unique()]) # 그룹 크기 불균형도 -> 값이 클수록 불균형
             prev_total_cost = prev_diff_cost + 10 * prev_size_cost
@@ -531,16 +534,19 @@ def cost_group_move_v2(max_iter, tolerance, w_discrete, w_continuous, init_group
                 print(group_sizes)
                 group_mean_size = group_sizes.mean()
                 # 이상적인 평균치 산출
-                pop_mean = float(init_grouped_df[selected_sort_variable].mean())
+                pop_mean = init_grouped_df[selected_sort_variable].mean()
                 # 그룹별 총 불균형도 계산 <- 여기에 연속형뿐만 아니라 그룹 n크기도 반영해야됨.
                 group_abs_mean_cost = {}
                 groups = init_grouped_df['초기그룹'].unique()
                 group_n_diff = {}
                 group_tanh = {} # softsign 또는 tahn 함수를 활용해서 방향성과 그 정도를 반영하는 방법도 고려해야함.
                 for g in groups:
+                    print(f"그룹 {g} 처리 중...")
                     group_df = init_grouped_df[init_grouped_df['초기그룹'] == g]
                     group_mean = group_df[selected_sort_variable].mean()
+                    print(f"    그룹 {g} 평균: {group_mean}, 전체 평균: {pop_mean}")
                     group_mean_diff = abs(group_mean - pop_mean) # 절대값
+                    print(f"    그룹 {g} 평균 편차: {group_mean_diff}")
                     group_n_diff[g] = len(group_df) - group_mean_size # 그룹의 크기를 방향성 있도록 반영
                     group_abs_mean_cost[g] = group_mean_diff # 그룹의 평균은 절대값으로 반영
                     group_tanh[g] = np.tanh(group_mean_size - len(group_df)) # 이상적 그룹 빈도보다 크면 -, 작으면 +, 같으면 0
@@ -560,10 +566,15 @@ def cost_group_move_v2(max_iter, tolerance, w_discrete, w_continuous, init_group
                     match_group_tanh_idx = sorted(group_n, key=group_n.get)[:2] # 그룹 크기가 작은 상위 2개 그룹 선택
                 # 평균차 뿐만 아니라 크기 차도 반영하여 선택 가능하도록 복합 점수 로직 추가
                 match_group_score = {}
+                print("group_abs_mean_cost:", group_abs_mean_cost)
                 for g in match_group_tanh_idx:
-                    match_group_mean_diff = group_abs_mean_cost[g]
+                    print(f'    그룹 {g} 점수 계산 중...')
+                    match_group_mean_diff = group_abs_mean_cost[g].sum()
+                    print(f'        평균 편차: {match_group_mean_diff}')
                     match_group_n_diff = abs(group_sizes[g] - group_mean_size)
+                    print(f'        그룹 크기 편차: {match_group_n_diff}')
                     match_group_score[g] = match_group_mean_diff + 10 * match_group_n_diff # 그룹 크기가 더 중요하도록 설정 + 스케일 차이
+                    print(f'        총 점수: {match_group_score[g]}')
                 print("타깃 그룹 후보의 비용 점수:", match_group_score)
                 match_group_idx = sorted(match_group_score, key=match_group_score.get, reverse=True)[:3] # 반대 방향 그룹 중 평균 편차 큰 상위 3개 그룹 선택
                 print("매칭 그룹:", set(match_group_idx))
@@ -615,7 +626,9 @@ def cost_group_move_v2(max_iter, tolerance, w_discrete, w_continuous, init_group
                 # 이동 후 비용 계산
                 new_group_mean = init_grouped_df.groupby('초기그룹')[selected_sort_variable].mean()
                 new_pop_mean = init_grouped_df[selected_sort_variable].mean()
-                new_diff_cost = sum([abs(gm - new_pop_mean) for gm in new_group_mean]) # 그룹 별 평균과 전체 평균의 차이의 절대값 합
+                mean_diff_df = (new_group_mean - new_pop_mean).abs()
+                #new_diff_cost = sum([abs(gm - new_pop_mean) for gm in new_group_mean]) # 그룹 별 평균과 전체 평균의 차이의 절대값 합
+                new_diff_cost = mean_diff_df.sum().sum() # 그룹 별 평균과 전체 평균의 차이의 절대값 합 -> 값이 클수록 불균형
                 new_size_cost = sum([abs(len(init_grouped_df[init_grouped_df['초기그룹'] == g]) - prev_mean_size) for g in init_grouped_df['초기그룹'].unique()]) # 그룹 크기 불균형도
                 new_total_cost = new_diff_cost + 10 * new_size_cost
                 print(f"이전 총 비용: {prev_total_cost}, 새로운 총 비용: {new_total_cost}")
@@ -629,9 +642,9 @@ def cost_group_move_v2(max_iter, tolerance, w_discrete, w_continuous, init_group
                 # 개선폭 기준 만족 시 중단
                 if improvement < tolerance:
                     print("개선 폭이 작아 중단합니다.")
+                    init_grouped_df = init_grouped_df.drop(columns=['그룹크기']) # 더미 변수 제거
                     break
                 prev_total_cost = new_total_cost
-
 
         # -------------------------------------------------
         # 이산형, 연속형 변수를 모두 선택한 경우
