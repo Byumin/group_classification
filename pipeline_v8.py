@@ -1581,8 +1581,8 @@ with tabs[4]:
                 st.info("동명이인 관계가 다른반으로 추가되었습니다.")
 
                 # 관계(relationship_dict) 텍스트 저장
-                with open('relationship_dict.txt', 'w', encoding='utf-8') as f:
-                    f.write(str(st.session_state['relationship_dict']))
+                # with open('relationship_dict.txt', 'w', encoding='utf-8') as f:
+                #     f.write(str(st.session_state['relationship_dict']))
                 # 그룹 재배정 로직 실행
                 selected_discrete_variable = st.session_state.get('selected_discrete_variable', [])
                 selected_discrete_variable = ['성별_명렬표' if var == '성별' else var for var in selected_discrete_variable]
@@ -1669,11 +1669,11 @@ with tabs[4]:
                         target_n_groups=group_assign_df['초기그룹'].nunique(),
                         verbose=True
                     )
-                    with open("relation_groups.txt", "w", encoding="utf-8") as f:
-                        for g in groups:
-                            f.write(str(g) + "\n")
-                        f.write(f"타깃 그룹 수: {group_assign_df['초기그룹'].nunique()}\n")
-                        f.write(f"관계 딕셔너리: {relationship_dict}\n")
+                    # with open("relation_groups.txt", "w", encoding="utf-8") as f:
+                    #     for g in groups:
+                    #         f.write(str(g) + "\n")
+                    #     f.write(f"타깃 그룹 수: {group_assign_df['초기그룹'].nunique()}\n")
+                    #     f.write(f"관계 딕셔너리: {relationship_dict}\n")
                     relationship_group_dict, relationship_group_df_dict = relation_groups_to_dict(groups, group_assign_df)
                     remaining_df, best_assignment, best_total_cost = assign_relation_groups_optimal(
                         group_assign_df, relationship_group_dict, relationship_group_df_dict, selected_discrete_variable
