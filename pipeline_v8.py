@@ -2280,8 +2280,8 @@ with tabs[7]:
     df_3['수험번호'] = None
     df_3['성명'] = processing_df['이름_명렬표']
     df_3['주민등록번호'] = None
-    df_3['진급반코드'] = processing_df['초기그룹']
-    df_3['진급반번호'] = processing_df['번호']
+    df_3['진급반코드'] = processing_df['초기그룹'].astype(int).astype(str).str.zfill(2)
+    df_3['진급반번호'] = processing_df['번호'].astype(int).astype(str).str.zfill(2)
     df_3['성별'] = processing_df['성별_명렬표'].map({'1':'남성', '2':'여성'})
     df_3['생년월일'] = None
     df_3 = df_3[['학번', '수험번호', '성명', '주민등록번호', '진급반코드', '진급반번호', '성별', '생년월일']]
